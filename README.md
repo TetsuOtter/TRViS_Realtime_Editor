@@ -13,7 +13,8 @@
 │   └── trvis-ws-server-bin/        E2E用 standalone バイナリ
 ├── test-harness/TRViSTestHarness/  .NET テストハーネス
 ├── docker/                         Docker compose 一式
-└── e2e-tests/                      Vitest による E2E テスト
+├── e2e-tests/                      Vitest による Rust 側 E2E テスト
+└── e2e-ui/                         Playwright による フロントエンド E2E テスト
 ```
 
 ## 開発
@@ -23,7 +24,10 @@ pnpm install
 pnpm tauri:dev          # Tauri デスクトップアプリ起動
 pnpm test               # フロントエンド単体テスト
 cargo test              # Rust テスト
-pnpm test:e2e           # E2E テスト (要 docker)
+pnpm test:e2e           # Rust 側 E2E テスト (要 docker)
+pnpm test:e2e:ui        # Playwright UI E2E (Vite dev server を自動起動。
+                        # WebSocket wire テストは事前に
+                        # `cargo build -p trvis-ws-server-bin` が必要)
 ```
 
 ## コード品質

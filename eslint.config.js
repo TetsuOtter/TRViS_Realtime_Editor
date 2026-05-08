@@ -17,6 +17,8 @@ export default tseslint.config(
 			"test-harness/**/obj/**",
 			"test-harness/**/Dependencies/**",
 			"e2e-tests/dist/**",
+			"playwright-report/**",
+			"test-results/**",
 			"docker/.tmp/**",
 		],
 	},
@@ -25,7 +27,7 @@ export default tseslint.config(
 	...tseslint.configs.recommended,
 
 	{
-		files: ["src/**/*.{ts,tsx}", "e2e-tests/**/*.ts"],
+		files: ["src/**/*.{ts,tsx}", "e2e-tests/**/*.ts", "e2e-ui/**/*.ts"],
 		languageOptions: {
 			ecmaVersion: 2022,
 			sourceType: "module",

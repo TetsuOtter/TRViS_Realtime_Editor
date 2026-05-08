@@ -195,6 +195,8 @@ docker/.tmp/
 # E2E artifacts
 /e2e-tests/dist/
 /e2e-tests/.tmp/
+/playwright-report/
+/test-results/
 
 # Internal harness data
 /docker/.tmp/

@@ -111,6 +111,51 @@ jobs:
         run: cargo test -p trvis-ws-server -p trvis-ws-server-bin
 
   # ---------------------------------------------------------------------------
+  # Playwright UI E2E: stub Tauri runtime in a real browser, plus a
+  # wire-level test that drives the standalone trvis-ws-server bin.
+  # ---------------------------------------------------------------------------
+  ui-e2e:
+    name: UI E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [frontend, rust]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build trvis-ws-server bin (for wire test)
+        run: cargo build -p trvis-ws-server-bin
+
+      - name: Run Playwright tests
+        run: pnpm test:e2e:ui
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
   # E2E: docker compose で app + harness 起動 → vitest e2e
   # ---------------------------------------------------------------------------
   e2e:

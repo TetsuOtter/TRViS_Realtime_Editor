@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { produce } from "immer";
+import { immer } from "zustand/middleware/immer";
+import { current } from "immer";
 import { v4 as uuidv4 } from "uuid";
 
 import type {
@@ -172,192 +173,192 @@ const findWork = (group: WorkGroupData | undefined, id: string | undefined) =>
 const findTrain = (work: WorkData | undefined, id: string | undefined) =>
 	work?.Trains.find((t) => t.Id === id);
 
-export const useEditorStore = create<EditorState>()((set, get) => {
-	const pushHistory = () =>
-		set(
-			produce<EditorState>((s) => {
-				s.history.past.push(structuredClone(s.workGroups));
+export const useEditorStore = create<EditorState>()(
+	immer((set, get) => {
+		const pushHistory = () =>
+			set((s) => {
+				s.history.past.push(current(s.workGroups));
 				if (s.history.past.length > HISTORY_LIMIT) s.history.past.shift();
 				s.history.future = [];
-			}),
-		);
+			});
 
-	const mutate = (fn: (s: EditorState) => void) => {
-		pushHistory();
-		set(produce(fn));
-	};
-
-	return {
-		workGroups: [],
-		selection: {},
-		remoteSelection: null,
-		syncedData: { Location_m: null, Time_ms: null, CanStart: true },
-		autoTimeMs: true,
-		history: { past: [], future: [] },
-
-		loadDocument: (workGroups) => {
+		const mutate = (fn: (s: EditorState) => void) => {
 			pushHistory();
-			set({ workGroups: structuredClone(workGroups) });
-		},
-		resetDocument: () => {
-			pushHistory();
-			set({ workGroups: [], selection: {} });
-		},
-		undo: () => {
-			const { history, workGroups } = get();
-			if (history.past.length === 0) return;
-			const prev = history.past[history.past.length - 1];
-			set({
-				workGroups: prev,
-				history: {
-					past: history.past.slice(0, -1),
-					future: [structuredClone(workGroups), ...history.future],
-				},
-			});
-		},
-		redo: () => {
-			const { history, workGroups } = get();
-			if (history.future.length === 0) return;
-			const next = history.future[0];
-			set({
-				workGroups: next,
-				history: {
-					past: [...history.past, structuredClone(workGroups)],
-					future: history.future.slice(1),
-				},
-			});
-		},
+			set(fn);
+		};
 
-		setSelection: (selection) => set({ selection }),
-		followRemoteSelection: () => {
-			const r = get().remoteSelection;
-			if (!r) return;
-			set({
-				selection: {
-					workGroupId: r.WorkGroupId,
-					workId: r.WorkId,
-					trainId: r.TrainId,
-				},
-			});
-		},
-		setRemoteSelection: (sel) => set({ remoteSelection: sel }),
+		return {
+			workGroups: [],
+			selection: {},
+			remoteSelection: null,
+			syncedData: { Location_m: null, Time_ms: null, CanStart: true },
+			autoTimeMs: true,
+			history: { past: [], future: [] },
 
-		setSyncedData: (patch) => set((s) => ({ syncedData: { ...s.syncedData, ...patch } })),
-		setAutoTimeMs: (autoTimeMs) => set({ autoTimeMs }),
+			loadDocument: (workGroups) => {
+				pushHistory();
+				set({ workGroups: structuredClone(workGroups) });
+			},
+			resetDocument: () => {
+				pushHistory();
+				set({ workGroups: [], selection: {} });
+			},
+			undo: () => {
+				const { history, workGroups } = get();
+				if (history.past.length === 0) return;
+				const prev = history.past[history.past.length - 1];
+				set({
+					workGroups: prev,
+					history: {
+						past: history.past.slice(0, -1),
+						future: [structuredClone(workGroups), ...history.future],
+					},
+				});
+			},
+			redo: () => {
+				const { history, workGroups } = get();
+				if (history.future.length === 0) return;
+				const next = history.future[0];
+				set({
+					workGroups: next,
+					history: {
+						past: [...history.past, structuredClone(workGroups)],
+						future: history.future.slice(1),
+					},
+				});
+			},
 
-		addWorkGroup: (init) => {
-			const wg = newWorkGroup(init);
-			mutate((s) => {
-				s.workGroups.push(wg);
-			});
-			return wg.Id!;
-		},
-		updateWorkGroup: (id, patch) =>
-			mutate((s) => {
-				const wg = findWorkGroup(s.workGroups, id);
-				if (wg) Object.assign(wg, patch);
-			}),
-		removeWorkGroup: (id) =>
-			mutate((s) => {
-				s.workGroups = s.workGroups.filter((g) => g.Id !== id);
-			}),
+			setSelection: (selection) => set({ selection }),
+			followRemoteSelection: () => {
+				const r = get().remoteSelection;
+				if (!r) return;
+				set({
+					selection: {
+						workGroupId: r.WorkGroupId,
+						workId: r.WorkId,
+						trainId: r.TrainId,
+					},
+				});
+			},
+			setRemoteSelection: (sel) => set({ remoteSelection: sel }),
 
-		addWork: (workGroupId, init) => {
-			const w = newWork(init);
-			mutate((s) => {
-				const wg = findWorkGroup(s.workGroups, workGroupId);
-				wg?.Works.push(w);
-			});
-			return w.Id!;
-		},
-		updateWork: (workGroupId, workId, patch) =>
-			mutate((s) => {
-				const work = findWork(findWorkGroup(s.workGroups, workGroupId), workId);
-				if (work) Object.assign(work, patch);
-			}),
-		removeWork: (workGroupId, workId) =>
-			mutate((s) => {
-				const wg = findWorkGroup(s.workGroups, workGroupId);
-				if (wg) wg.Works = wg.Works.filter((w) => w.Id !== workId);
-			}),
+			setSyncedData: (patch) => set((s) => ({ syncedData: { ...s.syncedData, ...patch } })),
+			setAutoTimeMs: (autoTimeMs) => set({ autoTimeMs }),
 
-		addTrain: (workGroupId, workId, init) => {
-			const t = newTrain(init);
-			mutate((s) => {
-				const work = findWork(findWorkGroup(s.workGroups, workGroupId), workId);
-				work?.Trains.push(t);
-			});
-			return t.Id!;
-		},
-		updateTrain: (workGroupId, workId, trainId, patch) =>
-			mutate((s) => {
-				const train = findTrain(
-					findWork(findWorkGroup(s.workGroups, workGroupId), workId),
-					trainId,
-				);
-				if (train) Object.assign(train, patch);
-			}),
-		removeTrain: (workGroupId, workId, trainId) =>
-			mutate((s) => {
-				const work = findWork(findWorkGroup(s.workGroups, workGroupId), workId);
-				if (work) work.Trains = work.Trains.filter((t) => t.Id !== trainId);
-			}),
+			addWorkGroup: (init) => {
+				const wg = newWorkGroup(init);
+				mutate((s) => {
+					s.workGroups.push(wg);
+				});
+				return wg.Id!;
+			},
+			updateWorkGroup: (id, patch) =>
+				mutate((s) => {
+					const wg = findWorkGroup(s.workGroups, id);
+					if (wg) Object.assign(wg, patch);
+				}),
+			removeWorkGroup: (id) =>
+				mutate((s) => {
+					s.workGroups = s.workGroups.filter((g) => g.Id !== id);
+				}),
 
-		addTimetableRow: (workGroupId, workId, trainId, init, insertIndex) => {
-			const row = newRow(init);
-			mutate((s) => {
-				const train = findTrain(
-					findWork(findWorkGroup(s.workGroups, workGroupId), workId),
-					trainId,
-				);
-				if (!train) return;
-				if (
-					typeof insertIndex === "number" &&
-					insertIndex >= 0 &&
-					insertIndex <= train.TimetableRows.length
-				) {
-					train.TimetableRows.splice(insertIndex, 0, row);
-				} else {
-					train.TimetableRows.push(row);
-				}
-			});
-			return row.Id!;
-		},
-		updateTimetableRow: (workGroupId, workId, trainId, rowId, patch) =>
-			mutate((s) => {
-				const train = findTrain(
-					findWork(findWorkGroup(s.workGroups, workGroupId), workId),
-					trainId,
-				);
-				const row = train?.TimetableRows.find((r) => r.Id === rowId);
-				if (row) Object.assign(row, patch);
-			}),
-		removeTimetableRow: (workGroupId, workId, trainId, rowId) =>
-			mutate((s) => {
-				const train = findTrain(
-					findWork(findWorkGroup(s.workGroups, workGroupId), workId),
-					trainId,
-				);
-				if (train) train.TimetableRows = train.TimetableRows.filter((r) => r.Id !== rowId);
-			}),
-		moveTimetableRow: (workGroupId, workId, trainId, rowId, toIndex) =>
-			mutate((s) => {
-				const train = findTrain(
-					findWork(findWorkGroup(s.workGroups, workGroupId), workId),
-					trainId,
-				);
-				if (!train) return;
-				const fromIndex = train.TimetableRows.findIndex((r) => r.Id === rowId);
-				if (fromIndex < 0) return;
-				const [row] = train.TimetableRows.splice(fromIndex, 1);
-				train.TimetableRows.splice(
-					Math.max(0, Math.min(toIndex, train.TimetableRows.length)),
-					0,
-					row,
-				);
-			}),
-	};
-});
+			addWork: (workGroupId, init) => {
+				const w = newWork(init);
+				mutate((s) => {
+					const wg = findWorkGroup(s.workGroups, workGroupId);
+					wg?.Works.push(w);
+				});
+				return w.Id!;
+			},
+			updateWork: (workGroupId, workId, patch) =>
+				mutate((s) => {
+					const work = findWork(findWorkGroup(s.workGroups, workGroupId), workId);
+					if (work) Object.assign(work, patch);
+				}),
+			removeWork: (workGroupId, workId) =>
+				mutate((s) => {
+					const wg = findWorkGroup(s.workGroups, workGroupId);
+					if (wg) wg.Works = wg.Works.filter((w) => w.Id !== workId);
+				}),
+
+			addTrain: (workGroupId, workId, init) => {
+				const t = newTrain(init);
+				mutate((s) => {
+					const work = findWork(findWorkGroup(s.workGroups, workGroupId), workId);
+					work?.Trains.push(t);
+				});
+				return t.Id!;
+			},
+			updateTrain: (workGroupId, workId, trainId, patch) =>
+				mutate((s) => {
+					const train = findTrain(
+						findWork(findWorkGroup(s.workGroups, workGroupId), workId),
+						trainId,
+					);
+					if (train) Object.assign(train, patch);
+				}),
+			removeTrain: (workGroupId, workId, trainId) =>
+				mutate((s) => {
+					const work = findWork(findWorkGroup(s.workGroups, workGroupId), workId);
+					if (work) work.Trains = work.Trains.filter((t) => t.Id !== trainId);
+				}),
+
+			addTimetableRow: (workGroupId, workId, trainId, init, insertIndex) => {
+				const row = newRow(init);
+				mutate((s) => {
+					const train = findTrain(
+						findWork(findWorkGroup(s.workGroups, workGroupId), workId),
+						trainId,
+					);
+					if (!train) return;
+					if (
+						typeof insertIndex === "number" &&
+						insertIndex >= 0 &&
+						insertIndex <= train.TimetableRows.length
+					) {
+						train.TimetableRows.splice(insertIndex, 0, row);
+					} else {
+						train.TimetableRows.push(row);
+					}
+				});
+				return row.Id!;
+			},
+			updateTimetableRow: (workGroupId, workId, trainId, rowId, patch) =>
+				mutate((s) => {
+					const train = findTrain(
+						findWork(findWorkGroup(s.workGroups, workGroupId), workId),
+						trainId,
+					);
+					const row = train?.TimetableRows.find((r) => r.Id === rowId);
+					if (row) Object.assign(row, patch);
+				}),
+			removeTimetableRow: (workGroupId, workId, trainId, rowId) =>
+				mutate((s) => {
+					const train = findTrain(
+						findWork(findWorkGroup(s.workGroups, workGroupId), workId),
+						trainId,
+					);
+					if (train) train.TimetableRows = train.TimetableRows.filter((r) => r.Id !== rowId);
+				}),
+			moveTimetableRow: (workGroupId, workId, trainId, rowId, toIndex) =>
+				mutate((s) => {
+					const train = findTrain(
+						findWork(findWorkGroup(s.workGroups, workGroupId), workId),
+						trainId,
+					);
+					if (!train) return;
+					const fromIndex = train.TimetableRows.findIndex((r) => r.Id === rowId);
+					if (fromIndex < 0) return;
+					const [row] = train.TimetableRows.splice(fromIndex, 1);
+					train.TimetableRows.splice(
+						Math.max(0, Math.min(toIndex, train.TimetableRows.length)),
+						0,
+						row,
+					);
+				}),
+		};
+	}),
+);
 
 /* -------------------------------------------------------------------------- */
 /*  Selectors                                                                  */

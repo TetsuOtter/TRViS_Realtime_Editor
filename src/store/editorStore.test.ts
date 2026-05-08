@@ -14,12 +14,9 @@ import type {
 	WorkGroupData,
 } from "../types/trvis";
 
-// Build a fresh store for each test group using zustand's immer middleware.
-// This avoids the editorStore singleton's compatibility issue where the internal
-// setState helper passes void mutators to zustand v5's set(), which replaces the
-// whole state with undefined (the immer middleware fixes this by wrapping void
-// functions with produce()).
-// The actual editorStore logic is re-implemented here using the middleware.
+// Each test group gets a fresh store instance with the same shape as the
+// singleton. We re-implement the store here (rather than reset the singleton)
+// so unit tests stay isolated from each other across the suite.
 
 type EditorState = {
 	workGroups: WorkGroupData[];

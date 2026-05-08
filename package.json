@@ -37,11 +37,6 @@
 		"uuid": "^11.0.3",
 		"zustand": "^5.0.2"
 	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"esbuild"
-		]
-	},
 	"devDependencies": {
 		"@tauri-apps/cli": "^2.1.0",
 		"@testing-library/jest-dom": "^6.9.1",

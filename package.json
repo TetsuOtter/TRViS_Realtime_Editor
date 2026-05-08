@@ -11,6 +11,8 @@
 		"tauri": "tauri",
 		"tauri:dev": "tauri dev",
 		"tauri:build": "tauri build",
+		"icons": "tauri icon src-tauri/icons/app-icon.png",
+		"postinstall": "node -e \"const fs=require('fs');if(!fs.existsSync('src-tauri/icons/icon.png')){require('child_process').spawnSync('pnpm',['icons'],{stdio:'inherit'})}\"",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write .",

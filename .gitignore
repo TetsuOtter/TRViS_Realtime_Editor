@@ -150,6 +150,11 @@ vite.config.ts.timestamp-*
 /src-tauri/target/
 /target/
 
+# Tauri 自動生成アイコン (`pnpm icons` / postinstall で再生成される)
+# ソース PNG のみコミットする。
+/src-tauri/icons/*
+!/src-tauri/icons/app-icon.png
+
 # IDE
 .vscode/
 .idea/

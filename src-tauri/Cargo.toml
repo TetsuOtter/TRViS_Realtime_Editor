@@ -1,0 +1,28 @@
+[package]
+name = "trvis-realtime-editor"
+version = "0.1.0"
+description = "TRViS Realtime Editor"
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "trvis_realtime_editor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.1", features = [] }
+tauri-plugin-shell = "2.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+trvis-ws-server.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+local-ip-address = "0.6"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

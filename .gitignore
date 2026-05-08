@@ -149,7 +149,6 @@ vite.config.ts.timestamp-*
 # Tauri / Rust
 /src-tauri/target/
 /target/
-/Cargo.lock
 
 # IDE
 .vscode/

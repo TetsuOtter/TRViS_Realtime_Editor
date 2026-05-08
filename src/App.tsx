@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { useEditorStore } from "./store/editorStore";
+import { useAutoBroadcast } from "./store/useAutoBroadcast";
 import { subscribeWsEvents } from "./api/wsServer";
 import { ConnectionPanel } from "./components/ConnectionPanel";
 import { EditorLayout } from "./components/EditorLayout";
 
 function App() {
 	const setRemoteSelection = useEditorStore((s) => s.setRemoteSelection);
+	useAutoBroadcast();
 
 	useEffect(() => {
 		let unsub: (() => void) | undefined;

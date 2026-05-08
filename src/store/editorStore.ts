@@ -32,6 +32,14 @@ export interface EditorState {
 	/** Time_ms を wall-clock 由来で自動更新するか */
 	autoTimeMs: boolean;
 
+	/**
+	 * 編集の度に WorkGroup 全体を自動配信するか (ライブモード)。
+	 * 現在の TRViS 本体は同一スコープの Timetable 更新でセレクションを初期化する
+	 * (TetsuOtter/TRViS Issue #214)。そのため UX が完成するのは TRViS 側修正後だが、
+	 * エディタ側の配信ロジックは先行して用意しておく。
+	 */
+	liveBroadcast: boolean;
+
 	/* History */
 	history: { past: WorkGroupData[][]; future: WorkGroupData[][] };
 
@@ -47,6 +55,7 @@ export interface EditorState {
 
 	setSyncedData: (patch: Partial<SyncedData>) => void;
 	setAutoTimeMs: (enabled: boolean) => void;
+	setLiveBroadcast: (enabled: boolean) => void;
 
 	addWorkGroup: (init?: Partial<WorkGroupData>) => string;
 	updateWorkGroup: (id: string, patch: Partial<WorkGroupData>) => void;
@@ -215,6 +224,7 @@ export const useEditorStore = create<EditorState>()(
 			remoteSelection: null,
 			syncedData: { Location_m: null, Time_ms: null, CanStart: true },
 			autoTimeMs: true,
+			liveBroadcast: false,
 			history: { past: [], future: [] },
 
 			loadDocument: (workGroups) => {
@@ -266,6 +276,7 @@ export const useEditorStore = create<EditorState>()(
 
 			setSyncedData: (patch) => set((s) => ({ syncedData: { ...s.syncedData, ...patch } })),
 			setAutoTimeMs: (autoTimeMs) => set({ autoTimeMs }),
+			setLiveBroadcast: (liveBroadcast) => set({ liveBroadcast }),
 
 			addWorkGroup: (init) => {
 				const wg = newWorkGroup(init);

@@ -4,7 +4,16 @@ import { broadcastAllWorkGroups } from "../api/wsServer";
 import type { WorkGroupData } from "../types/trvis";
 
 export function Toolbar() {
-	const { workGroups, history, loadDocument, undo, redo, addWorkGroup } = useEditorStore();
+	const {
+		workGroups,
+		history,
+		loadDocument,
+		undo,
+		redo,
+		addWorkGroup,
+		liveBroadcast,
+		setLiveBroadcast,
+	} = useEditorStore();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const handleFileOpen = () => fileInputRef.current?.click();
@@ -117,6 +126,30 @@ export function Toolbar() {
 			<button onClick={handleBroadcastAll} style={btnStyle} title="全データをTRViSに配信">
 				全データ配信
 			</button>
+
+			<label
+				style={{
+					display: "flex",
+					alignItems: "center",
+					gap: 4,
+					padding: "4px 10px",
+					border: "1px solid var(--border)",
+					borderRadius: 6,
+					background: liveBroadcast ? "var(--accent)" : "var(--bg-panel)",
+					color: liveBroadcast ? "#fff" : "var(--text)",
+					fontSize: 12,
+					cursor: "pointer",
+				}}
+				title="編集の度に全データを自動配信します。現状の TRViS は自スコープの更新で表示が初期化されるため、リアルタイム編集 UX には TRViS 側の対応が必要です (TetsuOtter/TRViS#214)"
+			>
+				<input
+					type="checkbox"
+					checked={liveBroadcast}
+					onChange={(e) => setLiveBroadcast(e.target.checked)}
+					style={{ accentColor: "var(--accent)" }}
+				/>
+				ライブモード
+			</label>
 		</div>
 	);
 }

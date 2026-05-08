@@ -141,3 +141,60 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# --- Project additions ---
+# Build output
+/dist/
+
+# Tauri / Rust
+/src-tauri/target/
+/target/
+/Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# .NET
+**/bin/
+**/obj/
+*.user
+
+# Docker temp
+docker/.tmp/
+
+# --- Project additions (continued) ---
+# TypeScript build cache
+/.ts-cache/
+*.tsbuildinfo
+
+# Tauri generated artifacts
+/src-tauri/gen/
+/src-tauri/WixTools/
+
+# Test coverage
+/coverage/
+*.lcov
+.nyc_output/
+
+# Vitest
+.vitest-cache/
+
+# Editor sessions
+*.swp
+*.swo
+*~
+
+# E2E artifacts
+/e2e-tests/dist/
+/e2e-tests/.tmp/
+
+# Internal harness data
+/docker/.tmp/
+/test-harness/**/*.dll.log
+
+# Claude Code per-project state
+/.claude/

@@ -1,0 +1,22 @@
+{
+	"useTabs": true,
+	"tabWidth": 2,
+	"semi": true,
+	"singleQuote": false,
+	"printWidth": 100,
+	"trailingComma": "all",
+	"bracketSpacing": true,
+	"bracketSameLine": false,
+	"arrowParens": "always",
+	"endOfLine": "lf",
+	"overrides": [
+		{
+			"files": ["*.md", "*.yml", "*.yaml"],
+			"options": { "useTabs": false, "tabWidth": 2 }
+		},
+		{
+			"files": "*.json",
+			"options": { "useTabs": true, "tabWidth": 2 }
+		}
+	]
+}

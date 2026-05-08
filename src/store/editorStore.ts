@@ -162,6 +162,28 @@ const newRow = (init?: Partial<TimetableRowData>): TimetableRowData => ({
 	WorkType: init?.WorkType ?? null,
 });
 
+/**
+ * 読み込んだJSONに `Id` が無い/`null` の要素があると、ツリーからの選択が
+ * `undefined` になりエディタが開けないため、ロード時に欠けているIDをUUIDで補完する。
+ */
+const normalizeWorkGroups = (workGroups: WorkGroupData[]): WorkGroupData[] =>
+	structuredClone(workGroups).map((wg) => ({
+		...wg,
+		Id: wg.Id ?? uuidv4(),
+		Works: (wg.Works ?? []).map((w) => ({
+			...w,
+			Id: w.Id ?? uuidv4(),
+			Trains: (w.Trains ?? []).map((t) => ({
+				...t,
+				Id: t.Id ?? uuidv4(),
+				TimetableRows: (t.TimetableRows ?? []).map((r) => ({
+					...r,
+					Id: r.Id ?? uuidv4(),
+				})),
+			})),
+		})),
+	}));
+
 const findWorkGroup = (
 	groups: WorkGroupData[],
 	id: string | undefined,
@@ -197,7 +219,7 @@ export const useEditorStore = create<EditorState>()(
 
 			loadDocument: (workGroups) => {
 				pushHistory();
-				set({ workGroups: structuredClone(workGroups) });
+				set({ workGroups: normalizeWorkGroups(workGroups) });
 			},
 			resetDocument: () => {
 				pushHistory();

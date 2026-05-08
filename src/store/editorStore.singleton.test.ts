@@ -34,6 +34,31 @@ describe("editorStore singleton", () => {
 		expect(wgs.map((w) => w.Id)).toEqual(["wg1", "wg2"]);
 	});
 
+	it("loadDocument fills missing Ids so tree clicks can select loaded items", () => {
+		useEditorStore.getState().loadDocument([
+			{
+				Name: "G",
+				Works: [
+					{
+						Name: "W",
+						Trains: [
+							{
+								TrainNumber: "1",
+								Direction: 1,
+								TimetableRows: [{ StationName: "東京", Location_m: 0 }],
+							},
+						],
+					},
+				],
+			},
+		]);
+		const wg = useEditorStore.getState().workGroups[0];
+		expect(wg.Id).toBeTruthy();
+		expect(wg.Works[0].Id).toBeTruthy();
+		expect(wg.Works[0].Trains[0].Id).toBeTruthy();
+		expect(wg.Works[0].Trains[0].TimetableRows[0].Id).toBeTruthy();
+	});
+
 	it("undo / redo round-trip works after addWorkGroup", () => {
 		const s = useEditorStore.getState();
 		s.addWorkGroup({ Name: "A" });

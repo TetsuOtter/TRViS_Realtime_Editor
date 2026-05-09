@@ -62,11 +62,12 @@ export function WorkGroupTree({ workGroups, onEditWorkGroup, onEditWork, onEditT
 		removeWork,
 		removeTrain,
 	} = useEditorStore();
-	const [expanded, setExpanded] = useState<Set<string>>(new Set());
+	// 既定では全展開。ユーザが折り畳んだ ID のみ collapsed に保持する。
+	const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 	const [ctxMenu, setCtxMenu] = useState<ContextMenu | null>(null);
 
 	const toggle = (id: string) => {
-		setExpanded((s) => {
+		setCollapsed((s) => {
 			const n = new Set(s);
 			if (n.has(id)) {
 				n.delete(id);
@@ -76,6 +77,7 @@ export function WorkGroupTree({ workGroups, onEditWorkGroup, onEditWork, onEditT
 			return n;
 		});
 	};
+	const isExpanded = (id: string) => !collapsed.has(id);
 
 	const closeCtx = () => setCtxMenu(null);
 
@@ -109,7 +111,6 @@ export function WorkGroupTree({ workGroups, onEditWorkGroup, onEditWork, onEditT
 				<button
 					onClick={() => {
 						const id = addWorkGroup();
-						setExpanded((s) => new Set(s).add(id));
 						setSelection({ workGroupId: id });
 					}}
 					style={{
@@ -128,7 +129,7 @@ export function WorkGroupTree({ workGroups, onEditWorkGroup, onEditWork, onEditT
 
 			{workGroups.map((wg) => {
 				const wgSelected = selection.workGroupId === wg.Id && !selection.workId;
-				const wgExpanded = expanded.has(wg.Id!);
+				const wgExpanded = isExpanded(wg.Id!);
 				return (
 					<div key={wg.Id}>
 						{/* WorkGroup行 */}
@@ -178,7 +179,7 @@ export function WorkGroupTree({ workGroups, onEditWorkGroup, onEditWork, onEditT
 									selection.workGroupId === wg.Id &&
 									selection.workId === w.Id &&
 									!selection.trainId;
-								const wExpanded = expanded.has(w.Id!);
+								const wExpanded = isExpanded(w.Id!);
 								return (
 									<div key={w.Id} style={{ paddingLeft: 20 }}>
 										<div
@@ -311,7 +312,6 @@ export function WorkGroupTree({ workGroups, onEditWorkGroup, onEditWork, onEditT
 								<button
 									onClick={() => {
 										const id = addWork(wg.Id!);
-										setExpanded((s) => new Set(s).add(id));
 										setSelection({ workGroupId: wg.Id ?? undefined, workId: id });
 									}}
 									style={{

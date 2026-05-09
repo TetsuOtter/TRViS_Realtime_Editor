@@ -11,6 +11,29 @@ async function loadMapLibre() {
 	return maplibre;
 }
 
+/**
+ * (lng, lat) を中心に半径 radiusM[m] の地理的円を近似するポリゴン頂点列を返す。
+ * GeoJSON Polygon 用のため最後の点で先頭に戻る (closed ring)。
+ */
+function geoCirclePolygon(
+	lng: number,
+	lat: number,
+	radiusM: number,
+	segments = 64,
+): [number, number][] {
+	const earthR = 6378137; // m
+	const latRad = (lat * Math.PI) / 180;
+	const dLatBase = (radiusM / earthR) * (180 / Math.PI);
+	const dLngBase = (radiusM / (earthR * Math.cos(latRad))) * (180 / Math.PI);
+	const ring: [number, number][] = [];
+	for (let i = 0; i < segments; i++) {
+		const t = (i / segments) * 2 * Math.PI;
+		ring.push([lng + dLngBase * Math.cos(t), lat + dLatBase * Math.sin(t)]);
+	}
+	ring.push(ring[0]);
+	return ring;
+}
+
 interface Props {
 	open: boolean;
 	onClose: () => void;
@@ -103,7 +126,8 @@ function LocationMapBody({
 		markersRef.current.forEach((m) => m.remove());
 		markersRef.current = [];
 
-		if (map.getLayer("radius-circles")) map.removeLayer("radius-circles");
+		if (map.getLayer("radius-circles-fill")) map.removeLayer("radius-circles-fill");
+		if (map.getLayer("radius-circles-outline")) map.removeLayer("radius-circles-outline");
 		if (map.getSource("radius-data")) map.removeSource("radius-data");
 
 		const geoRows = rows.filter((r) => r.Latitude_deg != null && r.Longitude_deg != null);
@@ -142,8 +166,10 @@ function LocationMapBody({
 			.map((r) => ({
 				type: "Feature" as const,
 				geometry: {
-					type: "Point" as const,
-					coordinates: [r.Longitude_deg!, r.Latitude_deg!],
+					type: "Polygon" as const,
+					coordinates: [
+						geoCirclePolygon(r.Longitude_deg!, r.Latitude_deg!, r.OnStationDetectRadius_m!),
+					],
 				},
 				properties: { radius: r.OnStationDetectRadius_m! },
 			}));
@@ -154,14 +180,20 @@ function LocationMapBody({
 				data: { type: "FeatureCollection", features: circleFeatures },
 			});
 			map.addLayer({
-				id: "radius-circles",
-				type: "circle",
+				id: "radius-circles-fill",
+				type: "fill",
 				source: "radius-data",
 				paint: {
-					"circle-radius": 20,
-					"circle-color": "rgba(0, 113, 227, 0.2)",
-					"circle-stroke-color": "#0071e3",
-					"circle-stroke-width": 1,
+					"fill-color": "rgba(0, 113, 227, 0.2)",
+				},
+			});
+			map.addLayer({
+				id: "radius-circles-outline",
+				type: "line",
+				source: "radius-data",
+				paint: {
+					"line-color": "#0071e3",
+					"line-width": 1,
 				},
 			});
 		}
@@ -436,7 +468,7 @@ function RowItem({ idx, row, active, onActivate, onFly, onChange }: RowItemProps
 				style={{
 					marginTop: 6,
 					display: "grid",
-					gridTemplateColumns: "1fr 1fr 1fr",
+					gridTemplateColumns: "1fr 1fr",
 					gap: 6,
 				}}
 				onClick={(e) => e.stopPropagation()}
@@ -465,6 +497,22 @@ function RowItem({ idx, row, active, onActivate, onFly, onChange }: RowItemProps
 						}
 						style={numInputStyle}
 						placeholder="未設定"
+					/>
+				</label>
+				<label style={{ fontSize: 10, color: "var(--text-muted)" }}>
+					起点距離(m)
+					<input
+						type="number"
+						step="1"
+						value={row.Location_m ?? ""}
+						onChange={(e) =>
+							onChange({
+								// Location_m はスキーマ上 required(number)。空欄時は 0 として扱う。
+								Location_m: e.target.value === "" ? 0 : Number(e.target.value),
+							})
+						}
+						style={numInputStyle}
+						placeholder="0"
 					/>
 				</label>
 				<label style={{ fontSize: 10, color: "var(--text-muted)" }}>

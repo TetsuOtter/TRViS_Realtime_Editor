@@ -9,7 +9,7 @@ license = "MIT"
 repository = "https://github.com/TetsuOtter/TRViS_Realtime_Editor"
 
 [workspace.dependencies]
-tokio = { version = "1.41", features = ["full"] }
+tokio = { version = "1.52", features = ["full"] }
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
 serde = { version = "1.0", features = ["derive"] }

@@ -208,7 +208,7 @@ async fn handle_connection(
 						continue;
 					}
 				};
-				if let Err(e) = ws_sink.send(Message::Text(json)).await {
+				if let Err(e) = ws_sink.send(Message::Text(json.into())).await {
 					let _ = state.events.send(ServerEvent::Error {
 						message: format!("send error to {client_id}: {e}"),
 					});

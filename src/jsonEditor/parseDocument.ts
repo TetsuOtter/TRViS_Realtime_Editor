@@ -3,7 +3,7 @@ import {
 	printParseErrorCode,
 	type ParseError as JsoncParseError,
 } from "jsonc-parser";
-import { Draft07 } from "json-schema-library";
+import { compileSchema } from "json-schema-library";
 import type { JSONSchema7 } from "json-schema";
 import type { WorkGroupData } from "../types/trvis";
 
@@ -192,14 +192,14 @@ export function positionToLineColumn(text: string, pos: number): { line: number;
 /**
  * JSON Schema (Draft-07) でデータを検証し、エラーをすべて返す。
  *
- * 内部で `json-schema-library` の `Draft07` を使う。CodeMirror 側で動いている
+ * 内部で `json-schema-library` の `compileSchema` を使う。CodeMirror 側で動いている
  * リンタ (`jsonSchemaLinter`) と同じバリデータを使うため、表示と適用時の
  * 判定が食い違わない。
  */
 export function validateAgainstSchema(data: unknown, schema: JSONSchema7): ParseError[] {
-	// JSONSchema7 と Draft07 のスキーマ型は実質互換だが TS 上は別物なので unknown を経由。
-	const draft = new Draft07(schema as unknown as Parameters<typeof Draft07.prototype.setSchema>[0]);
-	const errors = draft.validate(data);
+	// JSONSchema7 と JsonSchema のスキーマ型は実質互換だが TS 上は別物なので unknown を経由。
+	const node = compileSchema(schema as unknown as Parameters<typeof compileSchema>[0]);
+	const { errors } = node.validate(data);
 	return errors.map((err) => {
 		const pointer =
 			typeof err.data?.pointer === "string" && err.data.pointer.length > 0

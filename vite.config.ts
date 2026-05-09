@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import pkg from "./package.json";
@@ -19,10 +20,8 @@ export default defineConfig({
 	},
 	build: {
 		target: "es2022",
-		minify: "esbuild",
 		sourcemap: true,
 	},
-	// @ts-expect-error vitest extends vite's UserConfig with `test`
 	test: {
 		environment: "happy-dom",
 		globals: true,

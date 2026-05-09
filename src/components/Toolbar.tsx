@@ -4,6 +4,7 @@ import { broadcastAllWorkGroups } from "../api/wsServer";
 import { JsonEditDialog, type JsonEditDialogMode } from "../jsonEditor/JsonEditDialog";
 import { tryParseDocument, type ParseError } from "../jsonEditor/parseDocument";
 import { ThirdPartyLicensesDialog } from "./ThirdPartyLicensesDialog";
+import { AppInfoDialog } from "./AppInfoDialog";
 
 interface JsonDialogState {
 	mode: JsonEditDialogMode;
@@ -17,6 +18,7 @@ export function Toolbar() {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [jsonDialog, setJsonDialog] = useState<JsonDialogState | null>(null);
 	const [licensesOpen, setLicensesOpen] = useState(false);
+	const [appInfoOpen, setAppInfoOpen] = useState(false);
 
 	const handleFileOpen = () => fileInputRef.current?.click();
 
@@ -197,13 +199,22 @@ export function Toolbar() {
 			</label>
 
 			<button
-				onClick={() => setLicensesOpen(true)}
+				onClick={() => setAppInfoOpen(true)}
 				style={{ ...btnStyle, marginLeft: "auto" }}
+				title="バージョン・コミットハッシュなどのビルド情報を表示"
+			>
+				アプリ情報
+			</button>
+
+			<button
+				onClick={() => setLicensesOpen(true)}
+				style={btnStyle}
 				title="このアプリが利用しているサードパーティ OSS のライセンス一覧を表示"
 			>
 				サードパーティライセンス
 			</button>
 
+			<AppInfoDialog open={appInfoOpen} onClose={() => setAppInfoOpen(false)} />
 			<ThirdPartyLicensesDialog open={licensesOpen} onClose={() => setLicensesOpen(false)} />
 
 			<JsonEditDialog

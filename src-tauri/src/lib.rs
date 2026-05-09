@@ -270,6 +270,22 @@ fn list_local_hosts() -> Vec<String> {
 	list_local_ipv4()
 }
 
+#[derive(serde::Serialize, Clone)]
+struct AppInfo {
+	version: String,
+	commit: String,
+}
+
+/// アプリのバージョン (tauri.conf.json 由来) と
+/// ビルド時に埋め込んだ git コミットハッシュを返す。
+#[tauri::command]
+fn get_app_info(app: tauri::AppHandle) -> AppInfo {
+	AppInfo {
+		version: app.package_info().version.to_string(),
+		commit: env!("GIT_COMMIT").to_string(),
+	}
+}
+
 /// 任意のパスへ UTF-8 テキストを書き出す。
 /// JSON エクスポートで `dialog.save()` が返したパスをそのまま渡して使う想定。
 /// fs プラグイン全体を有効化せずに「ユーザがダイアログで選んだ 1 ファイル」だけを
@@ -358,7 +374,8 @@ pub fn run() {
 			broadcast_diagram_info,
 			set_synced_data,
 			list_local_hosts,
-			write_text_file
+			write_text_file,
+			get_app_info
 		])
 		.setup(|app| {
 			let _ = app.get_webview_window("main");

@@ -72,56 +72,6 @@ export function TimetableRowForm({ workGroupId, workId, trainId, row }: Props) {
 				/>
 			</Field>
 
-			<Field label="距離 (m) *">
-				<input
-					type="number"
-					value={row.Location_m}
-					onChange={(e) => upd({ Location_m: Number(e.target.value) })}
-					style={inputStyle}
-					step="0.1"
-				/>
-			</Field>
-
-			<Field label="経度 (deg)">
-				<input
-					type="number"
-					value={row.Longitude_deg ?? ""}
-					onChange={(e) =>
-						upd({ Longitude_deg: e.target.value === "" ? null : Number(e.target.value) })
-					}
-					style={inputStyle}
-					placeholder="未設定"
-					step="0.000001"
-				/>
-			</Field>
-
-			<Field label="緯度 (deg)">
-				<input
-					type="number"
-					value={row.Latitude_deg ?? ""}
-					onChange={(e) =>
-						upd({ Latitude_deg: e.target.value === "" ? null : Number(e.target.value) })
-					}
-					style={inputStyle}
-					placeholder="未設定"
-					step="0.000001"
-				/>
-			</Field>
-
-			<Field label="駅検出半径 (m)">
-				<input
-					type="number"
-					value={row.OnStationDetectRadius_m ?? ""}
-					onChange={(e) =>
-						upd({ OnStationDetectRadius_m: e.target.value === "" ? null : Number(e.target.value) })
-					}
-					style={inputStyle}
-					placeholder="未設定"
-					step="1"
-					min="0"
-				/>
-			</Field>
-
 			<Field label="フルネーム">
 				<input
 					value={row.FullName ?? ""}

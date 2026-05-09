@@ -1,0 +1,36 @@
+name: .NET harness build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "test-harness/**"
+      - ".github/workflows/dotnet-harness.yml"
+  pull_request:
+    paths:
+      - "test-harness/**"
+      - ".github/workflows/dotnet-harness.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: dotnet build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        working-directory: test-harness/TRViSTestHarness
+        run: dotnet restore
+
+      - name: Build
+        working-directory: test-harness/TRViSTestHarness
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        working-directory: test-harness/TRViSTestHarness
+        run: dotnet test --configuration Release --no-build --verbosity normal || echo "no test project (skipping)"

@@ -1,0 +1,22 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
+
+WORKDIR /build
+
+COPY test-harness/TRViSTestHarness/ ./TRViSTestHarness/
+
+RUN dotnet publish ./TRViSTestHarness/TRViSTestHarness.csproj \
+    -c Release \
+    -o /app \
+    --no-self-contained
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+
+WORKDIR /app
+COPY --from=builder /app ./
+
+EXPOSE 8080
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+ENTRYPOINT ["dotnet", "TRViSTestHarness.dll"]

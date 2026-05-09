@@ -1,0 +1,110 @@
+name: Tauri build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: tauri-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: ${{ matrix.platform.os }}
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # macOS は Apple Silicon (arm64) のみ
+          - { os: macos-arm64, runner: macos-latest, target: aarch64-apple-darwin }
+
+          # Linux: x86_64 / aarch64 の 2 ターゲット
+          - { os: linux-x64, runner: ubuntu-24.04, target: x86_64-unknown-linux-gnu }
+          - { os: linux-arm64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+
+          # Windows: x86_64 / aarch64 の 2 ターゲット
+          - { os: windows-x64, runner: windows-latest, target: x86_64-pc-windows-msvc }
+          - { os: windows-arm64, runner: windows-11-arm, target: aarch64-pc-windows-msvc }
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          shared-key: tauri-${{ matrix.platform.os }}
+
+      - name: Install Linux dependencies (apt picks the right arch automatically)
+        if: startsWith(matrix.platform.os, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
+
+      - run: pnpm install --frozen-lockfile
+
+      # 非タグビルド (PR / main push / 手動実行) では tauri.conf.json の version を
+      # `0.1.<run_number>` 形式で上書きし、生成バンドルの内部バージョンが固定値
+      # 0.1.0 のままにならないようにする。タグビルドはタグの値をそのまま使う想定なので
+      # 触らない。
+      - name: Stamp dev version (non-tag builds)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        shell: bash
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const p = 'src-tauri/tauri.conf.json';
+            const c = JSON.parse(fs.readFileSync(p, 'utf8'));
+            const parts = c.version.split('.');
+            const stamped = parts[0] + '.' + parts[1] + '.' + process.env.RUN_NUMBER;
+            c.version = stamped;
+            fs.writeFileSync(p, JSON.stringify(c, null, '\t') + '\n');
+            console.log('stamped version:', stamped);
+          "
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # build.rs がこの値を `cargo:rustc-env=GIT_COMMIT=...` で実行バイナリに埋め込む。
+          GIT_COMMIT: ${{ github.sha }}
+        with:
+          args: --target ${{ matrix.platform.target }}
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          releaseDraft: true
+          prerelease: false
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: tauri-${{ matrix.platform.os }}
+          path: |
+            target/${{ matrix.platform.target }}/release/bundle/**/*
+          if-no-files-found: ignore
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || (github.ref == 'refs/heads/main' && 7) || 14 }}

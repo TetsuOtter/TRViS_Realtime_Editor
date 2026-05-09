@@ -1,0 +1,2 @@
+# Clippy 設定。strict すぎる lint は外しつつ、bug-catch 系は残す。
+msrv = "1.80"

@@ -1,0 +1,32 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import pkg from "./package.json";
+
+const host = process.env.TAURI_DEV_HOST;
+
+export default defineConfig({
+	plugins: [react()],
+	clearScreen: false,
+	define: {
+		__APP_VERSION__: JSON.stringify(pkg.version),
+	},
+	server: {
+		port: 1420,
+		strictPort: true,
+		host: host || false,
+		hmr: host ? { protocol: "ws", host, port: 1421 } : undefined,
+		watch: { ignored: ["**/src-tauri/**", "**/test-harness/**", "**/docker/**"] },
+	},
+	build: {
+		target: "es2022",
+		minify: "esbuild",
+		sourcemap: true,
+	},
+	// @ts-expect-error vitest extends vite's UserConfig with `test`
+	test: {
+		environment: "happy-dom",
+		globals: true,
+		setupFiles: ["./src/test/setup.ts"],
+		include: ["src/**/*.test.{ts,tsx}"],
+	},
+});

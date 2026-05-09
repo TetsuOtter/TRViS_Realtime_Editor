@@ -1,0 +1,33 @@
+# Build output
+dist/
+build/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Rust
+target/
+src-tauri/target/
+src-tauri/gen/
+Cargo.lock
+
+# .NET
+test-harness/**/bin/
+test-harness/**/obj/
+test-harness/**/Dependencies/
+
+# Generated
+*.tsbuildinfo
+.ts-cache/
+
+# Lock files (handled by package managers)
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+
+# OS
+.DS_Store
+
+# Docker volumes
+docker/.tmp/

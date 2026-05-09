@@ -3,6 +3,7 @@ import { useEditorStore } from "../store/editorStore";
 import { broadcastAllWorkGroups } from "../api/wsServer";
 import { JsonEditDialog, type JsonEditDialogMode } from "../jsonEditor/JsonEditDialog";
 import { tryParseDocument, type ParseError } from "../jsonEditor/parseDocument";
+import { ThirdPartyLicensesDialog } from "./ThirdPartyLicensesDialog";
 
 interface JsonDialogState {
 	mode: JsonEditDialogMode;
@@ -15,6 +16,7 @@ export function Toolbar() {
 		useEditorStore();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [jsonDialog, setJsonDialog] = useState<JsonDialogState | null>(null);
+	const [licensesOpen, setLicensesOpen] = useState(false);
 
 	const handleFileOpen = () => fileInputRef.current?.click();
 
@@ -193,6 +195,16 @@ export function Toolbar() {
 				/>
 				ライブモード
 			</label>
+
+			<button
+				onClick={() => setLicensesOpen(true)}
+				style={{ ...btnStyle, marginLeft: "auto" }}
+				title="このアプリが利用しているサードパーティ OSS のライセンス一覧を表示"
+			>
+				サードパーティライセンス
+			</button>
+
+			<ThirdPartyLicensesDialog open={licensesOpen} onClose={() => setLicensesOpen(false)} />
 
 			<JsonEditDialog
 				open={jsonDialog !== null}

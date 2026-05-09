@@ -276,14 +276,35 @@ async fn handle_connection(
 }
 
 async fn process_client_text(state: &SharedState, client_id: &str, text: &str) {
-	// MessageType を含むメッセージは無視。TRViS 本体クライアントは ID 更新時に
-	// MessageType を付与しないため、付与されているメッセージはサーバ→クライアント方向の
-	// エコーバック等とみなして安全側に倒す。
 	let parsed: Value = match serde_json::from_str(text) {
 		Ok(v) => v,
 		Err(_) => return,
 	};
-	if parsed.get("MessageType").is_some() {
+
+	// `MessageType` がある場合は要求メッセージとしてルーティングする。
+	// TRViS 本体側 (commit 8c101e4 以降) は次の要求を送ってくる:
+	//   - {"MessageType":"RequestServerInfo"}
+	//   - {"MessageType":"RequestDiagramInfo","DiagramId":...}  (DiagramId は省略可)
+	// その他の MessageType は将来拡張用として無視する (エコーバック等の安全側倒し)。
+	if let Some(message_type) = parsed.get("MessageType").and_then(|v| v.as_str()) {
+		match message_type {
+			"RequestServerInfo" => {
+				let _ = state.events.send(ServerEvent::RequestServerInfo {
+					client_id: client_id.to_string(),
+				});
+			}
+			"RequestDiagramInfo" => {
+				let diagram_id = parsed
+					.get("DiagramId")
+					.and_then(|v| v.as_str())
+					.map(|s| s.to_string());
+				let _ = state.events.send(ServerEvent::RequestDiagramInfo {
+					client_id: client_id.to_string(),
+					diagram_id,
+				});
+			}
+			_ => {}
+		}
 		return;
 	}
 
@@ -384,5 +405,139 @@ mod tests {
 
 		ws.close(None).await.ok();
 		handle.shutdown().await;
+	}
+
+	#[tokio::test]
+	async fn server_routes_request_messages_to_events() {
+		let handle = start(ServerOptions {
+			host: "127.0.0.1".into(),
+			port: 0,
+			sync_interval: None,
+		})
+		.await
+		.unwrap();
+		let mut events = handle.state.subscribe();
+
+		let url = format!("ws://127.0.0.1:{}/ws", handle.bound_port);
+		let (mut ws, _resp) = connect_async(&url).await.unwrap();
+
+		// RequestServerInfo
+		ws.send(Message::Text(
+			r#"{"MessageType":"RequestServerInfo"}"#.into(),
+		))
+		.await
+		.unwrap();
+		// RequestDiagramInfo (DiagramId 指定)
+		ws.send(Message::Text(
+			r#"{"MessageType":"RequestDiagramInfo","DiagramId":"d-7"}"#.into(),
+		))
+		.await
+		.unwrap();
+		// RequestDiagramInfo (DiagramId 省略 = カレント)
+		ws.send(Message::Text(
+			r#"{"MessageType":"RequestDiagramInfo"}"#.into(),
+		))
+		.await
+		.unwrap();
+
+		let mut got_server_info = false;
+		let mut got_diagram_with_id = false;
+		let mut got_diagram_current = false;
+		for _ in 0..30 {
+			match events.recv().await {
+				Ok(ServerEvent::RequestServerInfo { .. }) => got_server_info = true,
+				Ok(ServerEvent::RequestDiagramInfo { diagram_id, .. }) => {
+					if diagram_id.as_deref() == Some("d-7") {
+						got_diagram_with_id = true;
+					} else if diagram_id.is_none() {
+						got_diagram_current = true;
+					}
+				}
+				_ => {}
+			}
+			if got_server_info && got_diagram_with_id && got_diagram_current {
+				break;
+			}
+		}
+		assert!(got_server_info, "RequestServerInfo が来なかった");
+		assert!(
+			got_diagram_with_id,
+			"RequestDiagramInfo (DiagramId付き) が来なかった"
+		);
+		assert!(
+			got_diagram_current,
+			"RequestDiagramInfo (DiagramIdなし) が来なかった"
+		);
+
+		ws.close(None).await.ok();
+		handle.shutdown().await;
+	}
+
+	#[tokio::test]
+	async fn server_serializes_remote_command_messages() {
+		use crate::messages::{
+			DiagramInfoMessage, HeaderColorMessage, NotificationMessage, OperationCommandMessage,
+			SelectTrainMessage, ServerInfoMessage, TimeFormatMessage,
+		};
+		// 主要な outbound 型が期待した JSON フィールドを出力することを最小チェック。
+		let s = serde_json::to_string(&ServerInfoMessage::new(
+			Some("srv".into()),
+			None,
+			Some("1.0".into()),
+			None,
+		))
+		.unwrap();
+		assert!(s.contains(r#""MessageType":"ServerInfo""#));
+		assert!(s.contains(r#""Name":"srv""#));
+		assert!(s.contains(r#""Version":"1.0""#));
+
+		let s = serde_json::to_string(&DiagramInfoMessage::new(
+			Some("d1".into()),
+			Some("朝ダイヤ".into()),
+			None,
+			Some(vec!["wg1".into()]),
+		))
+		.unwrap();
+		assert!(s.contains(r#""MessageType":"DiagramInfo""#));
+		assert!(s.contains(r#""DiagramId":"d1""#));
+		assert!(
+			!s.contains(r#""Id":"d1""#),
+			"DiagramInfo の id は DiagramId であるべき"
+		);
+
+		let s = serde_json::to_string(&SelectTrainMessage::new(
+			Some("wg".into()),
+			Some("w".into()),
+			Some("t".into()),
+		))
+		.unwrap();
+		assert!(s.contains(r#""MessageType":"SelectTrain""#));
+
+		let s = serde_json::to_string(&OperationCommandMessage::new("StartOperation")).unwrap();
+		assert!(s.contains(r#""Action":"StartOperation""#));
+
+		let s = serde_json::to_string(&HeaderColorMessage::with_color(0x336699)).unwrap();
+		assert!(s.contains(r#""Color_RGB":3368601"#));
+		assert!(s.contains(r#""ResetToDefault":false"#));
+
+		let reset = serde_json::to_string(&HeaderColorMessage::reset()).unwrap();
+		assert!(reset.contains(r#""ResetToDefault":true"#));
+		assert!(!reset.contains("Color_RGB"));
+
+		let s = serde_json::to_string(&NotificationMessage::new(
+			Some("n1".into()),
+			Some("お知らせ".into()),
+			Some("本文".into()),
+			1,
+			Some("2026-05-09T01:00:00+09:00".into()),
+		))
+		.unwrap();
+		assert!(s.contains(r#""Priority":1"#));
+
+		let s = serde_json::to_string(&TimeFormatMessage::new(Some("HH:mm".into()))).unwrap();
+		assert!(s.contains(r#""Format":"HH:mm""#));
+		// Format は null 値も出力する (端末既定リセットを意味する) — skip_serializing_if が無いことを確認
+		let s = serde_json::to_string(&TimeFormatMessage::new(None)).unwrap();
+		assert!(s.contains(r#""Format":null"#));
 	}
 }

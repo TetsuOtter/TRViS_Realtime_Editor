@@ -69,12 +69,13 @@ export function WorkForm({ workGroupId, work }: Props) {
 				/>
 			</Field>
 
-			<Field label="適用日 (YYYY-MM-DD)">
+			<Field label="施行日 (YYYY-MM-DD または 任意の文字列)">
 				<input
-					type="date"
+					type="text"
 					value={work.AffectDate ?? ""}
 					onChange={(e) => upd({ AffectDate: e.target.value || null })}
 					style={inputStyle}
+					placeholder="2024-01-01 / 平日 / 土休日 など"
 				/>
 			</Field>
 

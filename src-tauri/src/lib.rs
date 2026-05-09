@@ -6,8 +6,9 @@ use serde_json::Value;
 use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use trvis_ws_server::{
-	start, OutboundMessage, ServerEvent, ServerHandle, ServerOptions, ServerSyncedDataMessage,
-	ServerTimetableMessage,
+	start, DiagramInfoMessage, HeaderColorMessage, NotificationMessage, OperationCommandMessage,
+	OutboundMessage, SelectTrainMessage, ServerEvent, ServerHandle, ServerInfoMessage, ServerOptions,
+	ServerSyncedDataMessage, ServerTimetableMessage, TimeFormatMessage,
 };
 
 #[derive(Default)]
@@ -88,6 +89,163 @@ async fn broadcast_timetable(
 	Ok(())
 }
 
+/// 全クライアントへ `SelectTrain` メッセージを送る (TRViS で表示中の列車を切り替える指示)。
+#[tauri::command]
+async fn broadcast_select_train(
+	state: State<'_, AppState>,
+	work_group_id: Option<String>,
+	work_id: Option<String>,
+	train_id: Option<String>,
+) -> Result<(), String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = SelectTrainMessage::new(work_group_id, work_id, train_id);
+	handle
+		.state
+		.broadcast(OutboundMessage::SelectTrain(msg))
+		.await;
+	Ok(())
+}
+
+/// 全クライアントへ `OperationCommand` を送る。
+/// `action` は TRViS 側 enum 名 ("StartOperation" / "EndOperation" /
+/// "EnableLocationService" / "DisableLocationService") のいずれか。
+#[tauri::command]
+async fn broadcast_operation_command(
+	state: State<'_, AppState>,
+	action: String,
+) -> Result<(), String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	handle
+		.state
+		.broadcast(OutboundMessage::OperationCommand(
+			OperationCommandMessage::new(action),
+		))
+		.await;
+	Ok(())
+}
+
+/// 全クライアントへ `HeaderColor` を送る。
+/// `reset_to_default` が true の場合は端末既定にリセット (color_rgb は無視)。
+/// false の場合は `color_rgb` (0xRRGGBB の整数) を適用する。
+#[tauri::command]
+async fn broadcast_header_color(
+	state: State<'_, AppState>,
+	reset_to_default: bool,
+	color_rgb: Option<i32>,
+) -> Result<(), String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = if reset_to_default {
+		HeaderColorMessage::reset()
+	} else {
+		HeaderColorMessage::with_color(color_rgb.unwrap_or(0))
+	};
+	handle
+		.state
+		.broadcast(OutboundMessage::HeaderColor(msg))
+		.await;
+	Ok(())
+}
+
+/// 全クライアントへ `Notification` を送る。
+#[tauri::command]
+async fn broadcast_notification(
+	state: State<'_, AppState>,
+	id: Option<String>,
+	title: Option<String>,
+	body: Option<String>,
+	priority: Option<i32>,
+	issued_at: Option<String>,
+) -> Result<(), String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = NotificationMessage::new(id, title, body, priority.unwrap_or(0), issued_at);
+	handle
+		.state
+		.broadcast(OutboundMessage::Notification(msg))
+		.await;
+	Ok(())
+}
+
+/// 全クライアントへ `TimeFormat` を送る (例: `"HH:mm"` / `"HH:mm:ss"`)。
+/// `format` を省略 / null にした場合は端末既定にリセット。
+#[tauri::command]
+async fn broadcast_time_format(
+	state: State<'_, AppState>,
+	format: Option<String>,
+) -> Result<(), String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	handle
+		.state
+		.broadcast(OutboundMessage::TimeFormat(TimeFormatMessage::new(format)))
+		.await;
+	Ok(())
+}
+
+/// 全クライアントへ `ServerInfo` を送る (proactive broadcast)。
+/// `RequestServerInfo` への応答は `respond_server_info` を使うこと。
+#[tauri::command]
+async fn broadcast_server_info(
+	state: State<'_, AppState>,
+	name: Option<String>,
+	admin: Option<String>,
+	version: Option<String>,
+	protocol_version: Option<String>,
+) -> Result<(), String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = ServerInfoMessage::new(name, admin, version, protocol_version);
+	handle
+		.state
+		.broadcast(OutboundMessage::ServerInfo(msg))
+		.await;
+	Ok(())
+}
+
+/// 特定のクライアントだけに `ServerInfo` を返信する (`RequestServerInfo` の応答用)。
+/// 戻り値は送信に成功したかどうか (false = 送信先クライアントが既に切断されている)。
+#[tauri::command]
+async fn respond_server_info(
+	state: State<'_, AppState>,
+	client_id: String,
+	name: Option<String>,
+	admin: Option<String>,
+	version: Option<String>,
+	protocol_version: Option<String>,
+) -> Result<bool, String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = ServerInfoMessage::new(name, admin, version, protocol_version);
+	Ok(
+		handle
+			.state
+			.send_to(&client_id, OutboundMessage::ServerInfo(msg))
+			.await,
+	)
+}
+
+/// 全クライアントへ `DiagramInfo` を送る。
+#[tauri::command]
+async fn broadcast_diagram_info(
+	state: State<'_, AppState>,
+	diagram_id: Option<String>,
+	name: Option<String>,
+	description: Option<String>,
+	work_group_ids: Option<Vec<String>>,
+) -> Result<(), String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = DiagramInfoMessage::new(diagram_id, name, description, work_group_ids);
+	handle
+		.state
+		.broadcast(OutboundMessage::DiagramInfo(msg))
+		.await;
+	Ok(())
+}
+
 /// SyncedData の最新値を更新し、即時送信する。
 #[tauri::command]
 async fn set_synced_data(
@@ -153,6 +311,18 @@ fn server_event_to_json(ev: &ServerEvent) -> Value {
 				"clientId": client_id,
 				"message": message
 		}),
+		ServerEvent::RequestServerInfo { client_id } => serde_json::json!({
+				"type": "request-server-info",
+				"clientId": client_id,
+		}),
+		ServerEvent::RequestDiagramInfo {
+			client_id,
+			diagram_id,
+		} => serde_json::json!({
+				"type": "request-diagram-info",
+				"clientId": client_id,
+				"diagramId": diagram_id,
+		}),
 		ServerEvent::Error { message } => serde_json::json!({
 				"type": "error", "message": message
 		}),
@@ -168,6 +338,14 @@ pub fn run() {
 			start_server,
 			stop_server,
 			broadcast_timetable,
+			broadcast_select_train,
+			broadcast_operation_command,
+			broadcast_header_color,
+			broadcast_notification,
+			broadcast_time_format,
+			broadcast_server_info,
+			respond_server_info,
+			broadcast_diagram_info,
 			set_synced_data,
 			list_local_hosts
 		])

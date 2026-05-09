@@ -3,6 +3,7 @@ import { ErrorBoundary } from "react-error-boundary";
 
 import { useEditorStore } from "./store/editorStore";
 import { useAutoBroadcast } from "./store/useAutoBroadcast";
+import { useRemoteRequestResponder } from "./store/useRemoteRequestResponder";
 import { subscribeWsEvents } from "./api/wsServer";
 import { ConnectionPanel } from "./components/ConnectionPanel";
 import { EditorLayout } from "./components/EditorLayout";
@@ -10,6 +11,7 @@ import { EditorLayout } from "./components/EditorLayout";
 function App() {
 	const setRemoteSelection = useEditorStore((s) => s.setRemoteSelection);
 	useAutoBroadcast();
+	useRemoteRequestResponder();
 
 	useEffect(() => {
 		let unsub: (() => void) | undefined;

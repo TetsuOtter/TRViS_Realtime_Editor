@@ -122,7 +122,85 @@ export interface ServerTimetableMessage {
 	Data: WorkGroupData[] | WorkGroupData | WorkData | TrainData | null;
 }
 
-export type ServerMessage = ServerSyncedDataMessage | ServerTimetableMessage;
+/** サーバ → クライアント の ServerInfo (RequestServerInfo への応答 もしくは proactive broadcast) */
+export interface ServerInfoMessage {
+	MessageType: "ServerInfo";
+	Name?: string | null;
+	Admin?: string | null;
+	Version?: string | null;
+	ProtocolVersion?: string | null;
+}
+
+/**
+ * サーバ → クライアント の DiagramInfo。
+ * **JSON キーは `DiagramId`** であり `Id` ではない (TRViS 本体 WebSocketNetworkSyncService 仕様)。
+ */
+export interface ServerDiagramInfoMessage {
+	MessageType: "DiagramInfo";
+	DiagramId?: string | null;
+	Name?: string | null;
+	Description?: string | null;
+	WorkGroupIds?: string[] | null;
+}
+
+/** サーバ → クライアント: 列車選択指示 (TRViS 側で表示中列車を切り替えさせる) */
+export interface ServerSelectTrainMessage {
+	MessageType: "SelectTrain";
+	WorkGroupId?: string | null;
+	WorkId?: string | null;
+	TrainId?: string | null;
+}
+
+/** TRViS 側 OperationCommandType enum 名と一致させる必要がある */
+export type OperationCommandAction =
+	| "StartOperation"
+	| "EndOperation"
+	| "EnableLocationService"
+	| "DisableLocationService";
+
+/** サーバ → クライアント: 運行操作コマンド */
+export interface ServerOperationCommandMessage {
+	MessageType: "OperationCommand";
+	Action: OperationCommandAction;
+}
+
+/** サーバ → クライアント: タイトルバー色変更要求 */
+export interface ServerHeaderColorMessage {
+	MessageType: "HeaderColor";
+	ResetToDefault: boolean;
+	/** 0xRRGGBB の整数 (JSON 上は number。"#RRGGBB" 文字列ではない) */
+	Color_RGB?: number | null;
+}
+
+/** サーバ → クライアント: 通告データ */
+export interface ServerNotificationMessage {
+	MessageType: "Notification";
+	Id?: string | null;
+	Title?: string | null;
+	Body?: string | null;
+	/** 0=通常, 1=重要 など (サーバ任意) */
+	Priority: number;
+	/** ISO8601 文字列 */
+	IssuedAt?: string | null;
+}
+
+/** サーバ → クライアント: タイトルバー時刻表示フォーマット指定 */
+export interface ServerTimeFormatMessage {
+	MessageType: "TimeFormat";
+	/** null / 省略 で端末既定にリセット */
+	Format?: string | null;
+}
+
+export type ServerMessage =
+	| ServerSyncedDataMessage
+	| ServerTimetableMessage
+	| ServerInfoMessage
+	| ServerDiagramInfoMessage
+	| ServerSelectTrainMessage
+	| ServerOperationCommandMessage
+	| ServerHeaderColorMessage
+	| ServerNotificationMessage
+	| ServerTimeFormatMessage;
 
 /* -------------------------------------------------------------------------- */
 /*  Editor-internal types                                                     */
@@ -154,4 +232,6 @@ export type WsServerEvent =
 	| { type: "client-connected"; clientId: string }
 	| { type: "client-disconnected"; clientId: string }
 	| { type: "id-update"; clientId: string; message: ClientIdUpdateMessage }
+	| { type: "request-server-info"; clientId: string }
+	| { type: "request-diagram-info"; clientId: string; diagramId: string | null }
 	| { type: "error"; message: string };

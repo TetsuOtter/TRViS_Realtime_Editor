@@ -1,11 +1,12 @@
 import { useEditorStore, selectActiveWorkGroup } from "../store/editorStore";
-import { broadcastWorkGroup } from "../api/wsServer";
+import { broadcastWorkGroup, broadcastSelectTrain } from "../api/wsServer";
 
 export function RemoteSelectionBar() {
 	const remoteSelection = useEditorStore((s) => s.remoteSelection);
 	const followRemoteSelection = useEditorStore((s) => s.followRemoteSelection);
 	const workGroups = useEditorStore((s) => s.workGroups);
 	const activeWorkGroup = useEditorStore(selectActiveWorkGroup);
+	const selection = useEditorStore((s) => s.selection);
 
 	const remoteTrain = remoteSelection?.TrainId
 		? workGroups
@@ -19,6 +20,20 @@ export function RemoteSelectionBar() {
 			await broadcastWorkGroup(activeWorkGroup);
 		} catch (e) {
 			console.error("broadcastWorkGroup failed:", e);
+		}
+	};
+
+	const canPushSelection = !!(selection.workGroupId || selection.workId || selection.trainId);
+	const handlePushSelection = async () => {
+		if (!canPushSelection) return;
+		try {
+			await broadcastSelectTrain({
+				workGroupId: selection.workGroupId ?? null,
+				workId: selection.workId ?? null,
+				trainId: selection.trainId ?? null,
+			});
+		} catch (e) {
+			console.error("broadcastSelectTrain failed:", e);
 		}
 	};
 
@@ -68,7 +83,7 @@ export function RemoteSelectionBar() {
 			<button
 				onClick={handleBroadcast}
 				disabled={!activeWorkGroup}
-				title="この仕業群をTRViSに配信します (TRViS本体側に対応プロトコル拡張が必要)"
+				title="この仕業群をTRViSに配信します"
 				style={{
 					padding: "3px 10px",
 					fontSize: 12,
@@ -79,7 +94,24 @@ export function RemoteSelectionBar() {
 					cursor: activeWorkGroup ? "pointer" : "not-allowed",
 				}}
 			>
-				この仕業群をTRViSに配信 ※要プロトコル拡張
+				この仕業群をTRViSに配信
+			</button>
+
+			<button
+				onClick={handlePushSelection}
+				disabled={!canPushSelection}
+				title="エディタで選択中の列車をTRViSに表示させます (SelectTrain)"
+				style={{
+					padding: "3px 10px",
+					fontSize: 12,
+					border: "1px solid var(--border)",
+					borderRadius: 4,
+					background: "transparent",
+					color: canPushSelection ? "var(--text)" : "var(--text-muted)",
+					cursor: canPushSelection ? "pointer" : "not-allowed",
+				}}
+			>
+				編集中列車をTRViSで表示
 			</button>
 		</div>
 	);

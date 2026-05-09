@@ -35,6 +35,17 @@ pub enum ServerEvent {
 		client_id: String,
 		message: ClientIdUpdateMessage,
 	},
+	/// クライアントが `MessageType: "RequestServerInfo"` を送ってきた。
+	/// 上位レイヤは ServerInfo を組み立てて返信する想定。
+	RequestServerInfo {
+		client_id: String,
+	},
+	/// クライアントが `MessageType: "RequestDiagramInfo"` を送ってきた。
+	/// `diagram_id` が `None` の場合はカレントダイヤを要求している。
+	RequestDiagramInfo {
+		client_id: String,
+		diagram_id: Option<String>,
+	},
 	Error {
 		message: String,
 	},
@@ -71,6 +82,15 @@ impl SharedState {
 		let senders = self.outbound_senders.lock().await;
 		for sender in senders.values() {
 			let _ = sender.send(message.clone());
+		}
+	}
+
+	/// 指定クライアントだけに送信。送信先が存在しなければ `false` を返す。
+	pub async fn send_to(&self, client_id: &str, message: OutboundMessage) -> bool {
+		let senders = self.outbound_senders.lock().await;
+		match senders.get(client_id) {
+			Some(sender) => sender.send(message).is_ok(),
+			None => false,
 		}
 	}
 }

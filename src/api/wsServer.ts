@@ -5,6 +5,7 @@
  */
 
 import type {
+	OperationCommandAction,
 	ServerTimetableMessage,
 	WorkGroupData,
 	WorkData,
@@ -117,6 +118,130 @@ export async function broadcastTrain(
 		workId,
 		trainId: train.Id,
 		data: train,
+	});
+}
+
+/**
+ * TRViS で表示中の列車を切り替える指示を送る (`SelectTrain` メッセージ)。
+ * いずれかのフィールドが省略されている階層は TRViS 側のデフォルトに従う想定。
+ */
+export async function broadcastSelectTrain(args: {
+	workGroupId?: string | null;
+	workId?: string | null;
+	trainId?: string | null;
+}): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("broadcast_select_train", {
+		workGroupId: args.workGroupId ?? null,
+		workId: args.workId ?? null,
+		trainId: args.trainId ?? null,
+	});
+}
+
+/** 運行操作コマンド (運行開始 / 終了 / 位置情報サービスの ON / OFF) を送る。 */
+export async function broadcastOperationCommand(action: OperationCommandAction): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("broadcast_operation_command", { action });
+}
+
+/**
+ * タイトルバー色変更要求を送る。
+ * `colorRgb` は 0xRRGGBB の整数 (例: `0x336699`)。`resetToDefault: true` のときは無視される。
+ */
+export async function broadcastHeaderColor(args: {
+	resetToDefault: boolean;
+	colorRgb?: number | null;
+}): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("broadcast_header_color", {
+		resetToDefault: args.resetToDefault,
+		colorRgb: args.resetToDefault ? null : (args.colorRgb ?? null),
+	});
+}
+
+/** 通告 (任意のお知らせ) を送る。 */
+export async function broadcastNotification(args: {
+	id?: string | null;
+	title?: string | null;
+	body?: string | null;
+	priority?: number | null;
+	/** ISO8601 文字列 */
+	issuedAt?: string | null;
+}): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("broadcast_notification", {
+		id: args.id ?? null,
+		title: args.title ?? null,
+		body: args.body ?? null,
+		priority: args.priority ?? null,
+		issuedAt: args.issuedAt ?? null,
+	});
+}
+
+/** タイトルバーの時刻表示フォーマットを変更する。`format` を null/省略すると端末既定にリセット。 */
+export async function broadcastTimeFormat(format?: string | null): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("broadcast_time_format", { format: format ?? null });
+}
+
+/** ServerInfo を全クライアントへ proactive に配信する。 */
+export async function broadcastServerInfo(args: {
+	name?: string | null;
+	admin?: string | null;
+	version?: string | null;
+	protocolVersion?: string | null;
+}): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("broadcast_server_info", {
+		name: args.name ?? null,
+		admin: args.admin ?? null,
+		version: args.version ?? null,
+		protocolVersion: args.protocolVersion ?? null,
+	});
+}
+
+/**
+ * 特定のクライアントだけに `ServerInfo` を返信する (`RequestServerInfo` への応答)。
+ * 戻り値は送信先クライアントがまだ接続されていれば true。
+ */
+export async function respondServerInfo(args: {
+	clientId: string;
+	name?: string | null;
+	admin?: string | null;
+	version?: string | null;
+	protocolVersion?: string | null;
+}): Promise<boolean> {
+	const t = await loadTauri();
+	if (!t) return false;
+	return t.invoke<boolean>("respond_server_info", {
+		clientId: args.clientId,
+		name: args.name ?? null,
+		admin: args.admin ?? null,
+		version: args.version ?? null,
+		protocolVersion: args.protocolVersion ?? null,
+	});
+}
+
+/** DiagramInfo を全クライアントへ配信する。 */
+export async function broadcastDiagramInfo(args: {
+	diagramId?: string | null;
+	name?: string | null;
+	description?: string | null;
+	workGroupIds?: string[] | null;
+}): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("broadcast_diagram_info", {
+		diagramId: args.diagramId ?? null,
+		name: args.name ?? null,
+		description: args.description ?? null,
+		workGroupIds: args.workGroupIds ?? null,
 	});
 }
 

@@ -13,6 +13,7 @@ import { TimetableRowForm } from "./Forms/TimetableRowForm";
 import { TimetableTable } from "./TimetableTable";
 import { MapPanel } from "./MapPanel";
 import { RemoteSelectionBar } from "./RemoteSelectionBar";
+import { RemoteCommandsPanel } from "./RemoteCommandsPanel";
 import { SyncedDataPanel } from "./SyncedDataPanel";
 import { Toolbar } from "./Toolbar";
 import type { TimetableRowData } from "../types/trvis";
@@ -55,6 +56,7 @@ export function EditorLayout() {
 		<div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
 			<Toolbar />
 			<RemoteSelectionBar />
+			<RemoteCommandsPanel />
 
 			<div style={{ flex: 1, display: "flex", minHeight: 0 }}>
 				{/* 左: ツリービュー */}

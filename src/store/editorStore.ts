@@ -34,9 +34,8 @@ export interface EditorState {
 
 	/**
 	 * 編集の度に WorkGroup 全体を自動配信するか (ライブモード)。
-	 * 現在の TRViS 本体は同一スコープの Timetable 更新でセレクションを初期化する
-	 * (TetsuOtter/TRViS Issue #214)。そのため UX が完成するのは TRViS 側修正後だが、
-	 * エディタ側の配信ロジックは先行して用意しておく。
+	 * TRViS 本体は #214 対応により、自スコープと一致する Timetable 更新では
+	 * 選択中の Train / 駅 index / 位置情報を維持して再描画するようになった。
 	 */
 	liveBroadcast: boolean;
 

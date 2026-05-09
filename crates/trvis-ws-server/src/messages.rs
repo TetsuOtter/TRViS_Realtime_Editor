@@ -85,11 +85,216 @@ impl ServerTimetableMessage {
 	}
 }
 
+/// サーバ → クライアント の ServerInfo メッセージ。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ServerInfoMessage {
+	#[serde(rename = "MessageType")]
+	pub message_type: String,
+	#[serde(rename = "Name", skip_serializing_if = "Option::is_none")]
+	pub name: Option<String>,
+	#[serde(rename = "Admin", skip_serializing_if = "Option::is_none")]
+	pub admin: Option<String>,
+	#[serde(rename = "Version", skip_serializing_if = "Option::is_none")]
+	pub version: Option<String>,
+	#[serde(rename = "ProtocolVersion", skip_serializing_if = "Option::is_none")]
+	pub protocol_version: Option<String>,
+}
+
+impl ServerInfoMessage {
+	pub fn new(
+		name: Option<String>,
+		admin: Option<String>,
+		version: Option<String>,
+		protocol_version: Option<String>,
+	) -> Self {
+		Self {
+			message_type: "ServerInfo".into(),
+			name,
+			admin,
+			version,
+			protocol_version,
+		}
+	}
+}
+
+/// サーバ → クライアント の DiagramInfo メッセージ。
+/// ID のフィールド名は **`DiagramId`** であり、`Id` ではない (TRViS 本体の WebSocketNetworkSyncService 仕様)。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DiagramInfoMessage {
+	#[serde(rename = "MessageType")]
+	pub message_type: String,
+	#[serde(rename = "DiagramId", skip_serializing_if = "Option::is_none")]
+	pub diagram_id: Option<String>,
+	#[serde(rename = "Name", skip_serializing_if = "Option::is_none")]
+	pub name: Option<String>,
+	#[serde(rename = "Description", skip_serializing_if = "Option::is_none")]
+	pub description: Option<String>,
+	#[serde(rename = "WorkGroupIds", skip_serializing_if = "Option::is_none")]
+	pub work_group_ids: Option<Vec<String>>,
+}
+
+impl DiagramInfoMessage {
+	pub fn new(
+		diagram_id: Option<String>,
+		name: Option<String>,
+		description: Option<String>,
+		work_group_ids: Option<Vec<String>>,
+	) -> Self {
+		Self {
+			message_type: "DiagramInfo".into(),
+			diagram_id,
+			name,
+			description,
+			work_group_ids,
+		}
+	}
+}
+
+/// サーバ → クライアント: 列車選択指示。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SelectTrainMessage {
+	#[serde(rename = "MessageType")]
+	pub message_type: String,
+	#[serde(rename = "WorkGroupId", skip_serializing_if = "Option::is_none")]
+	pub work_group_id: Option<String>,
+	#[serde(rename = "WorkId", skip_serializing_if = "Option::is_none")]
+	pub work_id: Option<String>,
+	#[serde(rename = "TrainId", skip_serializing_if = "Option::is_none")]
+	pub train_id: Option<String>,
+}
+
+impl SelectTrainMessage {
+	pub fn new(
+		work_group_id: Option<String>,
+		work_id: Option<String>,
+		train_id: Option<String>,
+	) -> Self {
+		Self {
+			message_type: "SelectTrain".into(),
+			work_group_id,
+			work_id,
+			train_id,
+		}
+	}
+}
+
+/// サーバ → クライアント: 運行操作コマンド。
+/// `Action` は文字列で、TRViS 側の `OperationCommandType` enum 名と一致させる必要がある。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OperationCommandMessage {
+	#[serde(rename = "MessageType")]
+	pub message_type: String,
+	#[serde(rename = "Action")]
+	pub action: String,
+}
+
+impl OperationCommandMessage {
+	pub fn new(action: impl Into<String>) -> Self {
+		Self {
+			message_type: "OperationCommand".into(),
+			action: action.into(),
+		}
+	}
+}
+
+/// サーバ → クライアント: タイトルバー色変更要求。
+/// `color_rgb` は 0xRRGGBB の整数。`reset_to_default` が true の場合は端末既定に戻す。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeaderColorMessage {
+	#[serde(rename = "MessageType")]
+	pub message_type: String,
+	#[serde(rename = "ResetToDefault")]
+	pub reset_to_default: bool,
+	#[serde(rename = "Color_RGB", skip_serializing_if = "Option::is_none")]
+	pub color_rgb: Option<i32>,
+}
+
+impl HeaderColorMessage {
+	pub fn reset() -> Self {
+		Self {
+			message_type: "HeaderColor".into(),
+			reset_to_default: true,
+			color_rgb: None,
+		}
+	}
+
+	pub fn with_color(color_rgb: i32) -> Self {
+		Self {
+			message_type: "HeaderColor".into(),
+			reset_to_default: false,
+			color_rgb: Some(color_rgb),
+		}
+	}
+}
+
+/// サーバ → クライアント: 通告 (任意のお知らせ) 配信。
+/// `issued_at` は RFC3339 (ISO8601) 文字列。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NotificationMessage {
+	#[serde(rename = "MessageType")]
+	pub message_type: String,
+	#[serde(rename = "Id", skip_serializing_if = "Option::is_none")]
+	pub id: Option<String>,
+	#[serde(rename = "Title", skip_serializing_if = "Option::is_none")]
+	pub title: Option<String>,
+	#[serde(rename = "Body", skip_serializing_if = "Option::is_none")]
+	pub body: Option<String>,
+	#[serde(rename = "Priority")]
+	pub priority: i32,
+	#[serde(rename = "IssuedAt", skip_serializing_if = "Option::is_none")]
+	pub issued_at: Option<String>,
+}
+
+impl NotificationMessage {
+	pub fn new(
+		id: Option<String>,
+		title: Option<String>,
+		body: Option<String>,
+		priority: i32,
+		issued_at: Option<String>,
+	) -> Self {
+		Self {
+			message_type: "Notification".into(),
+			id,
+			title,
+			body,
+			priority,
+			issued_at,
+		}
+	}
+}
+
+/// サーバ → クライアント: タイトルバー時刻表示フォーマット指定。
+/// `format` が `None` (JSON 上 `null` / 省略) の場合は端末既定にリセットを意味する。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TimeFormatMessage {
+	#[serde(rename = "MessageType")]
+	pub message_type: String,
+	#[serde(rename = "Format")]
+	pub format: Option<String>,
+}
+
+impl TimeFormatMessage {
+	pub fn new(format: Option<String>) -> Self {
+		Self {
+			message_type: "TimeFormat".into(),
+			format,
+		}
+	}
+}
+
 /// 上位(UI/Tauri) からサーバに送信を依頼するメッセージ。
 #[derive(Debug, Clone)]
 pub enum OutboundMessage {
 	Timetable(ServerTimetableMessage),
 	SyncedData(ServerSyncedDataMessage),
+	ServerInfo(ServerInfoMessage),
+	DiagramInfo(DiagramInfoMessage),
+	SelectTrain(SelectTrainMessage),
+	OperationCommand(OperationCommandMessage),
+	HeaderColor(HeaderColorMessage),
+	Notification(NotificationMessage),
+	TimeFormat(TimeFormatMessage),
 }
 
 impl OutboundMessage {
@@ -97,6 +302,13 @@ impl OutboundMessage {
 		match self {
 			OutboundMessage::Timetable(m) => serde_json::to_string(m),
 			OutboundMessage::SyncedData(m) => serde_json::to_string(m),
+			OutboundMessage::ServerInfo(m) => serde_json::to_string(m),
+			OutboundMessage::DiagramInfo(m) => serde_json::to_string(m),
+			OutboundMessage::SelectTrain(m) => serde_json::to_string(m),
+			OutboundMessage::OperationCommand(m) => serde_json::to_string(m),
+			OutboundMessage::HeaderColor(m) => serde_json::to_string(m),
+			OutboundMessage::Notification(m) => serde_json::to_string(m),
+			OutboundMessage::TimeFormat(m) => serde_json::to_string(m),
 		}
 	}
 }

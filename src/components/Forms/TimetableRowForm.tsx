@@ -179,7 +179,7 @@ export function TimetableRowForm({ workGroupId, workId, trainId, row }: Props) {
 				/>
 			</Field>
 
-			<Field label="営業のみ停車">
+			<Field label="運転停車">
 				<NullableBoolean
 					value={row.IsOperationOnlyStop}
 					onChange={(v) => upd({ IsOperationOnlyStop: v })}

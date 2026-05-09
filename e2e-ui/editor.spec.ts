@@ -109,12 +109,8 @@ test("JSONを開く + drill into train shows timetable", async ({ page }) => {
 		buffer: Buffer.from(JSON.stringify(SAMPLE_DOC)),
 	});
 
-	// Expand the work group → expand the work → select the train.
-	// Each ▶ becomes ▼ when expanded, so we always grab the first remaining ▶.
-	await page.getByText("▶").first().click();
+	// ツリーは既定で全展開されるため、仕業群配下の仕業・列車は読み込み直後に見える。
 	await expect(page.getByText("仕業A")).toBeVisible();
-
-	await page.getByText("▶").first().click();
 	await expect(page.getByText("1001M → 東京")).toBeVisible();
 
 	await page.getByText("1001M → 東京").click();

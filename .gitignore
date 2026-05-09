@@ -151,9 +151,12 @@ vite.config.ts.timestamp-*
 /target/
 
 # Tauri 自動生成アイコン (`pnpm icons` / postinstall で再生成される)
-# ソース PNG のみコミットする。
+# ソースは app-icon.svg。app-icon.png は SVG から `pnpm icons:render` で
+# 再生成される派生物だが、過去コミットの後方互換・利便性のため追跡を残してある。
+# fg / bg バリアントは派生物なので追跡しない。
 /src-tauri/icons/*
 !/src-tauri/icons/app-icon.png
+!/src-tauri/icons/app-icon.svg
 
 # IDE
 .vscode/

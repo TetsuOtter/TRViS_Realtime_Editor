@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="TRViS Realtime Editor">
+	<defs>
+		<linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0%" stop-color="#28385c"/>
+			<stop offset="100%" stop-color="#0a1322"/>
+		</linearGradient>
+		<linearGradient id="barGrad" x1="0" y1="0" x2="1" y2="0">
+			<stop offset="0%" stop-color="#eef2f6"/>
+			<stop offset="100%" stop-color="#98a4b2"/>
+		</linearGradient>
+		<linearGradient id="pencilBody" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0%" stop-color="#f6c170"/>
+			<stop offset="50%" stop-color="#e8a347"/>
+			<stop offset="100%" stop-color="#bf7e26"/>
+		</linearGradient>
+		<linearGradient id="pencilWood" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0%" stop-color="#f5dcaa"/>
+			<stop offset="100%" stop-color="#cfa66d"/>
+		</linearGradient>
+		<radialGradient id="liveCore" cx="0.5" cy="0.5" r="0.5">
+			<stop offset="0%" stop-color="#ff6363"/>
+			<stop offset="100%" stop-color="#b51c1c"/>
+		</radialGradient>
+	</defs>
+
+	<!-- Base rounded square (bg layer) -->
+	<g id="bg">
+		<rect width="1024" height="1024" rx="224" ry="224" fill="url(#bgGrad)"/>
+	</g>
+
+	<!-- Foreground figures (timetable + pencil + live indicator) -->
+	<g id="fg">
+		<!-- Timetable: vertical stop line + 3 station nodes -->
+		<line x1="220" y1="320" x2="220" y2="780"
+		      stroke="#a9c6e0" stroke-width="22" stroke-linecap="round"/>
+		<g fill="#cee0f2" stroke="#7fa1c5" stroke-width="4">
+			<circle cx="220" cy="345" r="22"/>
+			<circle cx="220" cy="555" r="22"/>
+			<circle cx="220" cy="755" r="22"/>
+		</g>
+
+		<!-- Three time bars (descending widths) -->
+		<g fill="url(#barGrad)">
+			<rect x="280" y="320" width="540" height="50" rx="25"/>
+			<rect x="280" y="530" width="470" height="50" rx="25"/>
+			<rect x="280" y="730" width="380" height="50" rx="25"/>
+		</g>
+
+		<!-- Pencil drawing on the middle bar (rotated around its tip) -->
+		<g transform="translate(380 555) rotate(-50)">
+			<polygon points="0,0 38,-14 38,14" fill="#1a140e"/>
+			<polygon points="38,-14 82,-30 82,30 38,14" fill="url(#pencilWood)"/>
+			<rect x="82" y="-30" width="340" height="60" fill="url(#pencilBody)"/>
+			<rect x="82" y="-30" width="340" height="6" fill="#ffffff" opacity="0.22"/>
+			<rect x="82" y="24" width="340" height="6" fill="#000000" opacity="0.20"/>
+			<rect x="422" y="-32" width="34" height="64" fill="#5d5043"/>
+			<rect x="422" y="-32" width="34" height="14" fill="#7c6a57"/>
+			<rect x="422" y="18"  width="34" height="14" fill="#3a3024"/>
+			<rect x="456" y="-28" width="44" height="56" rx="6" fill="#2c2218"/>
+		</g>
+
+		<!-- Live indicator dot at the pencil tip -->
+		<circle cx="380" cy="555" r="14" fill="#ff3b3b"/>
+
+		<!-- Top-right live broadcast indicator: concentric red waves + core -->
+		<g transform="translate(810 200)">
+			<circle r="120" fill="#ff3838" opacity="0.16"/>
+			<circle r="92"  fill="#ff3838" opacity="0.30"/>
+			<circle r="62"  fill="#ff3838" opacity="0.55"/>
+			<circle r="34"  fill="url(#liveCore)"/>
+		</g>
+	</g>
+</svg>

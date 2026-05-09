@@ -32,13 +32,13 @@ jobs:
           - { os: windows-arm64, runner: windows-11-arm, target: aarch64-pc-windows-msvc }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -49,7 +49,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: ./src-tauri -> target
+          workspaces: . -> target
           shared-key: tauri-${{ matrix.platform.os }}
 
       - name: Install Linux dependencies (apt picks the right arch automatically)
@@ -100,11 +100,11 @@ jobs:
           releaseDraft: true
           prerelease: false
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: tauri-${{ matrix.platform.os }}
           path: |
-            src-tauri/target/${{ matrix.platform.target }}/release/bundle/**/*
+            target/${{ matrix.platform.target }}/release/bundle/**/*
           if-no-files-found: ignore
           retention-days: ${{ github.event_name == 'pull_request' && 1 || (github.ref == 'refs/heads/main' && 7) || 14 }}

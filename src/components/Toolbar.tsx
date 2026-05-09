@@ -1,20 +1,20 @@
-import { useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useEditorStore } from "../store/editorStore";
 import { broadcastAllWorkGroups } from "../api/wsServer";
-import type { WorkGroupData } from "../types/trvis";
+import { JsonEditDialog, type JsonEditDialogMode } from "../jsonEditor/JsonEditDialog";
+import { tryParseDocument, type ParseError } from "../jsonEditor/parseDocument";
+
+interface JsonDialogState {
+	mode: JsonEditDialogMode;
+	initialText: string;
+	initialErrors?: ParseError[];
+}
 
 export function Toolbar() {
-	const {
-		workGroups,
-		history,
-		loadDocument,
-		undo,
-		redo,
-		addWorkGroup,
-		liveBroadcast,
-		setLiveBroadcast,
-	} = useEditorStore();
+	const { workGroups, history, undo, redo, addWorkGroup, liveBroadcast, setLiveBroadcast } =
+		useEditorStore();
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [jsonDialog, setJsonDialog] = useState<JsonDialogState | null>(null);
 
 	const handleFileOpen = () => fileInputRef.current?.click();
 
@@ -23,25 +23,64 @@ export function Toolbar() {
 		if (!file) return;
 		const reader = new FileReader();
 		reader.onload = (ev) => {
-			try {
-				const json = JSON.parse(ev.target?.result as string);
-				const data: WorkGroupData[] = Array.isArray(json) ? json : [json];
-				loadDocument(data);
-			} catch {
-				alert("JSONの読み込みに失敗しました");
+			const text = (ev.target?.result as string) ?? "";
+			const r = tryParseDocument(text);
+			if (r.ok) {
+				useEditorStore.getState().loadDocument(r.data);
+				return;
 			}
+			// 失敗時は内容と理由をエディタダイアログに渡し、ユーザがその場で直せるようにする。
+			setJsonDialog({
+				mode: "fix-load",
+				initialText: text,
+				initialErrors: r.errors,
+			});
 		};
 		reader.readAsText(file);
 		e.target.value = "";
 	};
 
-	const handleExport = () => {
-		const json = JSON.stringify(workGroups, null, 2);
+	const currentJsonText = useMemo(() => JSON.stringify(workGroups, null, 2), [workGroups]);
+
+	const handleEditJson = () => {
+		setJsonDialog({
+			mode: "edit",
+			initialText: currentJsonText,
+		});
+	};
+
+	const handleExport = async () => {
+		const json = currentJsonText;
+		const defaultName = `trvis-data-${new Date()
+			.toISOString()
+			.replace(/[:.]/g, "-")
+			.slice(0, 19)}.json`;
+
+		// Tauri 環境ではネイティブの保存ダイアログを開いて、選んだパスへ書き出す。
+		// それ以外 (vite dev / vitest 等) ではブラウザのダウンロードにフォールバックする。
+		if ((window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) {
+			try {
+				const { save } = await import("@tauri-apps/plugin-dialog");
+				const { invoke } = await import("@tauri-apps/api/core");
+				const path = await save({
+					title: "JSONをエクスポート",
+					defaultPath: defaultName,
+					filters: [{ name: "JSON", extensions: ["json"] }],
+				});
+				if (!path) return; // キャンセル
+				await invoke("write_text_file", { path, contents: json });
+			} catch (e) {
+				console.error("export failed:", e);
+				alert(`エクスポートに失敗しました: ${e}`);
+			}
+			return;
+		}
+
 		const blob = new Blob([json], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;
-		a.download = "trvis-data.json";
+		a.download = defaultName;
 		a.click();
 		URL.revokeObjectURL(url);
 	};
@@ -89,6 +128,10 @@ export function Toolbar() {
 
 			<button onClick={handleExport} style={btnStyle}>
 				JSONをエクスポート
+			</button>
+
+			<button onClick={handleEditJson} style={btnStyle} title="現在のデータを JSON で直接編集">
+				JSONを編集
 			</button>
 
 			<div style={{ width: 1, height: 20, background: "var(--border)" }} />
@@ -150,6 +193,14 @@ export function Toolbar() {
 				/>
 				ライブモード
 			</label>
+
+			<JsonEditDialog
+				open={jsonDialog !== null}
+				mode={jsonDialog?.mode ?? "edit"}
+				initialText={jsonDialog?.initialText ?? ""}
+				initialErrors={jsonDialog?.initialErrors}
+				onClose={() => setJsonDialog(null)}
+			/>
 		</div>
 	);
 }

@@ -34,6 +34,23 @@ describe("editorStore singleton", () => {
 		expect(wgs.map((w) => w.Id)).toEqual(["wg1", "wg2"]);
 	});
 
+	it("loadDocument resets selection / history and bumps documentVersion (まっさらロード)", () => {
+		// Pre-state: 既存のドキュメント / 選択 / undo 履歴がある
+		useEditorStore.getState().addWorkGroup({ Name: "Pre" });
+		useEditorStore.getState().setSelection({ workGroupId: "stale" });
+		expect(useEditorStore.getState().history.past.length).toBeGreaterThan(0);
+		const v0 = useEditorStore.getState().documentVersion;
+
+		useEditorStore.getState().loadDocument([{ Id: "wg1", Name: "G1", Works: [] }]);
+
+		const s = useEditorStore.getState();
+		expect(s.workGroups.map((w) => w.Name)).toEqual(["G1"]);
+		expect(s.selection).toEqual({});
+		expect(s.history.past).toHaveLength(0);
+		expect(s.history.future).toHaveLength(0);
+		expect(s.documentVersion).toBe(v0 + 1);
+	});
+
 	it("loadDocument fills missing Ids so tree clicks can select loaded items", () => {
 		useEditorStore.getState().loadDocument([
 			{
@@ -57,6 +74,50 @@ describe("editorStore singleton", () => {
 		expect(wg.Works[0].Id).toBeTruthy();
 		expect(wg.Works[0].Trains[0].Id).toBeTruthy();
 		expect(wg.Works[0].Trains[0].TimetableRows[0].Id).toBeTruthy();
+	});
+
+	it("replaceDocument は履歴を残し、生存している選択は維持する", () => {
+		useEditorStore.getState().loadDocument([
+			{
+				Id: "wg",
+				Name: "G",
+				Works: [
+					{
+						Id: "w",
+						Name: "W",
+						Trains: [{ Id: "t", TrainNumber: "1", Direction: 1, TimetableRows: [] }],
+					},
+				],
+			},
+		]);
+		useEditorStore.setState({ selection: { workGroupId: "wg", workId: "w", trainId: "t" } });
+
+		// 同じ ID の Train を残したまま中身だけ変える
+		useEditorStore.getState().replaceDocument([
+			{
+				Id: "wg",
+				Name: "G-new",
+				Works: [
+					{
+						Id: "w",
+						Name: "W-new",
+						Trains: [{ Id: "t", TrainNumber: "999", Direction: 1, TimetableRows: [] }],
+					},
+				],
+			},
+		]);
+		const s1 = useEditorStore.getState();
+		expect(s1.workGroups[0].Name).toBe("G-new");
+		expect(s1.selection).toEqual({ workGroupId: "wg", workId: "w", trainId: "t" });
+		// 履歴に直前の状態が積まれている → undo で戻れる
+		expect(s1.history.past.length).toBeGreaterThan(0);
+
+		// Train を消したら trainId だけクリアされ、上位 (workGroupId/workId) は残る
+		useEditorStore
+			.getState()
+			.replaceDocument([{ Id: "wg", Name: "G", Works: [{ Id: "w", Name: "W", Trains: [] }] }]);
+		const s2 = useEditorStore.getState();
+		expect(s2.selection).toEqual({ workGroupId: "wg", workId: "w", trainId: undefined });
 	});
 
 	it("undo / redo round-trip works after addWorkGroup", () => {

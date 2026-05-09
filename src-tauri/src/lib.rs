@@ -270,6 +270,15 @@ fn list_local_hosts() -> Vec<String> {
 	list_local_ipv4()
 }
 
+/// 任意のパスへ UTF-8 テキストを書き出す。
+/// JSON エクスポートで `dialog.save()` が返したパスをそのまま渡して使う想定。
+/// fs プラグイン全体を有効化せずに「ユーザがダイアログで選んだ 1 ファイル」だけを
+/// 書き換えられるようにするための薄いラッパ。
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+	std::fs::write(&path, contents).map_err(|e| format!("ファイル書き込みに失敗しました: {e}"))
+}
+
 fn list_local_ipv4() -> Vec<String> {
 	use local_ip_address::list_afinet_netifas;
 	let mut hosts = vec![];
@@ -333,6 +342,7 @@ fn server_event_to_json(ev: &ServerEvent) -> Value {
 pub fn run() {
 	tauri::Builder::default()
 		.plugin(tauri_plugin_shell::init())
+		.plugin(tauri_plugin_dialog::init())
 		.manage(AppState::default())
 		.invoke_handler(tauri::generate_handler![
 			start_server,
@@ -347,7 +357,8 @@ pub fn run() {
 			respond_server_info,
 			broadcast_diagram_info,
 			set_synced_data,
-			list_local_hosts
+			list_local_hosts,
+			write_text_file
 		])
 		.setup(|app| {
 			let _ = app.get_webview_window("main");

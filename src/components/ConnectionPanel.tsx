@@ -1,13 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import QRCode from "qrcode";
-import {
-	startServer,
-	stopServer,
-	listLocalHosts,
-	subscribeWsEvents,
-	getTrvisAppLinkWs,
-} from "../api/wsServer";
+import { useEffect, useState, useCallback } from "react";
+import { startServer, stopServer, listLocalHosts, subscribeWsEvents } from "../api/wsServer";
 import type { ConnectionStatus } from "../types/trvis";
+import { SyncedDataPanel } from "./SyncedDataPanel";
+import { ConnectionInfoDialog } from "./ConnectionInfoDialog";
 
 const DEFAULT_PORT = 23519;
 
@@ -27,17 +22,7 @@ export function ConnectionPanel() {
 		clientCount: 0,
 		errorMsg: "",
 	});
-	const [activeHostIdx, setActiveHostIdx] = useState(0);
-	const [copied, setCopied] = useState(false);
-	const canvasRef = useRef<HTMLCanvasElement>(null);
-
-	const activeHost = serverState.hosts[activeHostIdx] ?? "";
-	const wsUrl = activeHost ? getTrvisAppLinkWs(activeHost, serverState.port) : "";
-
-	useEffect(() => {
-		if (!wsUrl || !canvasRef.current) return;
-		QRCode.toCanvas(canvasRef.current, wsUrl, { width: 160, margin: 1 }).catch(() => {});
-	}, [wsUrl]);
+	const [infoOpen, setInfoOpen] = useState(false);
 
 	useEffect(() => {
 		let unsub: (() => void) | undefined;
@@ -52,7 +37,6 @@ export function ConnectionPanel() {
 						hosts: ev.hosts,
 						errorMsg: "",
 					}));
-					setActiveHostIdx(0);
 				} else if (ev.type === "stopped") {
 					setServerState((s) => ({
 						...s,
@@ -61,6 +45,7 @@ export function ConnectionPanel() {
 						clientCount: 0,
 					}));
 					clientIds.clear();
+					setInfoOpen(false);
 				} else if (ev.type === "client-connected") {
 					clientIds.add(ev.clientId);
 					setServerState((s) => ({
@@ -108,18 +93,12 @@ export function ConnectionPanel() {
 		await stopServer();
 	}, []);
 
-	const handleCopy = useCallback(() => {
-		if (!wsUrl) return;
-		navigator.clipboard.writeText(wsUrl).then(() => {
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		});
-	}, [wsUrl]);
-
 	const isRunning =
 		serverState.status === "listening" ||
 		serverState.status === "client-connected" ||
 		serverState.status === "starting";
+
+	const canShowInfo = isRunning && serverState.hosts.length > 0;
 
 	const statusLabel: Record<ConnectionStatus, string> = {
 		stopped: "停止中",
@@ -197,68 +176,51 @@ export function ConnectionPanel() {
 					>
 						停止
 					</button>
+					<button
+						onClick={() => setInfoOpen(true)}
+						disabled={!canShowInfo}
+						style={{
+							padding: "4px 12px",
+							background: !canShowInfo ? "var(--border)" : "var(--bg)",
+							color: !canShowInfo ? "var(--text-muted)" : "var(--text)",
+							border: "1px solid var(--border)",
+							borderRadius: 6,
+							fontSize: 13,
+							cursor: !canShowInfo ? "default" : "pointer",
+						}}
+						title="接続用 URL と QR コードをダイアログで表示"
+					>
+						URL/QR
+					</button>
 				</div>
 				{serverState.errorMsg && (
-					<div style={{ fontSize: 11, color: "var(--danger)" }}>{serverState.errorMsg}</div>
+					<div
+						style={{
+							fontSize: 11,
+							color: "var(--danger)",
+							maxWidth: 200,
+							whiteSpace: "nowrap",
+							overflow: "hidden",
+							textOverflow: "ellipsis",
+						}}
+						title={serverState.errorMsg}
+					>
+						{serverState.errorMsg}
+					</div>
 				)}
 			</div>
 
-			{/* QRコードと接続URL */}
-			{isRunning && serverState.hosts.length > 0 && (
-				<>
-					{/* ホストタブ */}
-					<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-						{serverState.hosts.length > 1 && (
-							<div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-								{serverState.hosts.map((h, i) => (
-									<button
-										key={h}
-										onClick={() => setActiveHostIdx(i)}
-										style={{
-											padding: "2px 8px",
-											fontSize: 11,
-											border: "1px solid var(--border)",
-											borderRadius: 4,
-											background: i === activeHostIdx ? "var(--accent)" : "transparent",
-											color: i === activeHostIdx ? "#fff" : "var(--text)",
-										}}
-									>
-										{h}
-									</button>
-								))}
-							</div>
-						)}
-						<div
-							style={{
-								fontSize: 11,
-								color: "var(--text-muted)",
-								fontFamily: "monospace",
-								maxWidth: 340,
-								wordBreak: "break-all",
-							}}
-						>
-							{wsUrl}
-						</div>
-						<button
-							onClick={handleCopy}
-							style={{
-								padding: "3px 10px",
-								fontSize: 12,
-								border: "1px solid var(--border)",
-								borderRadius: 4,
-								background: copied ? "#34c759" : "transparent",
-								color: copied ? "#fff" : "var(--text)",
-								width: "fit-content",
-							}}
-						>
-							{copied ? "コピー完了" : "URLをコピー"}
-						</button>
-					</div>
+			{/* 同期データ (右端) */}
+			<div style={{ marginLeft: "auto", flex: "1 1 240px", minWidth: 0, maxWidth: 360 }}>
+				<SyncedDataPanel compact />
+			</div>
 
-					{/* QRコード */}
-					<canvas ref={canvasRef} style={{ borderRadius: 4 }} />
-				</>
-			)}
+			<ConnectionInfoDialog
+				open={infoOpen && canShowInfo}
+				onClose={() => setInfoOpen(false)}
+				hosts={serverState.hosts}
+				port={serverState.port}
+			/>
 		</div>
 	);
 }

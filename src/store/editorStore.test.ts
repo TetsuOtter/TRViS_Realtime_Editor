@@ -156,12 +156,18 @@ function createTestStore() {
 				autoTimeMs: true,
 				history: { past: [], future: [] },
 				loadDocument: (wgs) => {
-					push();
-					set({ workGroups: structuredClone(wgs) });
+					set({
+						workGroups: structuredClone(wgs),
+						selection: {},
+						history: { past: [], future: [] },
+					});
 				},
 				resetDocument: () => {
-					push();
-					set({ workGroups: [], selection: {} });
+					set({
+						workGroups: [],
+						selection: {},
+						history: { past: [], future: [] },
+					});
 				},
 				undo: () => {
 					const { history, workGroups } = get();
@@ -307,10 +313,16 @@ describe("editorStore", () => {
 			expect(get().workGroups[0].Name).toBe("Group1");
 		});
 
-		it("loadDocument は履歴に積む", () => {
+		it("loadDocument は履歴と選択をリセットする (まっさらロード)", () => {
+			get().addWorkGroup({ Name: "Pre" });
+			get().setSelection({ workGroupId: "anything" });
+			expect(get().history.past.length).toBeGreaterThanOrEqual(1);
+
 			const docs: WorkGroupData[] = [{ Id: "wg1", Name: "G1", Works: [] }];
 			get().loadDocument(docs);
-			expect(get().history.past.length).toBeGreaterThanOrEqual(1);
+			expect(get().history.past).toHaveLength(0);
+			expect(get().history.future).toHaveLength(0);
+			expect(get().selection).toEqual({});
 		});
 
 		it("resetDocument で workGroups が空になる", () => {

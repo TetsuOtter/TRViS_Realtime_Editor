@@ -10,6 +10,7 @@ import { EditorLayout } from "./components/EditorLayout";
 
 function App() {
 	const setRemoteSelection = useEditorStore((s) => s.setRemoteSelection);
+	const documentVersion = useEditorStore((s) => s.documentVersion);
 	useAutoBroadcast();
 	useRemoteRequestResponder();
 
@@ -42,7 +43,9 @@ function App() {
 			<div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
 				<ConnectionPanel />
 				<div style={{ flex: 1, minHeight: 0 }}>
-					<EditorLayout />
+					{/* documentVersion を key にして、JSON を開き直したらツリーの展開状態や
+					    編集ダイアログ等のローカル state を強制的にリセットする。 */}
+					<EditorLayout key={documentVersion} />
 				</div>
 			</div>
 		</ErrorBoundary>

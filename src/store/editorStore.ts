@@ -42,8 +42,21 @@ export interface EditorState {
 	/* History */
 	history: { past: WorkGroupData[][]; future: WorkGroupData[][] };
 
+	/**
+	 * ドキュメントロード(loadDocument / resetDocument)のたびに増えるカウンタ。
+	 * UI 側で `key` として使うことで、ファイルを開き直した際にツリーの展開状態や
+	 * 編集ダイアログ等のローカル state を強制的に初期化する。
+	 */
+	documentVersion: number;
+
 	/* ----- Actions ----- */
 	loadDocument: (workGroups: WorkGroupData[]) => void;
+	/**
+	 * 現在編集中のドキュメントを差し替える (in-place 編集向け)。
+	 * `loadDocument` と異なり履歴は保持し、選択中の WorkGroup/Work/Train が
+	 * 新しいデータにも存在すれば選択を維持、消えていればその階層から先をクリアする。
+	 */
+	replaceDocument: (workGroups: WorkGroupData[]) => void;
 	resetDocument: () => void;
 	undo: () => void;
 	redo: () => void;
@@ -223,16 +236,50 @@ export const useEditorStore = create<EditorState>()(
 			remoteSelection: null,
 			syncedData: { Location_m: null, Time_ms: null, CanStart: true },
 			autoTimeMs: true,
-			liveBroadcast: false,
+			liveBroadcast: true,
 			history: { past: [], future: [] },
+			documentVersion: 0,
 
 			loadDocument: (workGroups) => {
+				set((s) => ({
+					workGroups: normalizeWorkGroups(workGroups),
+					selection: {},
+					history: { past: [], future: [] },
+					documentVersion: s.documentVersion + 1,
+				}));
+			},
+			replaceDocument: (workGroups) => {
+				const next = normalizeWorkGroups(workGroups);
+				const cur = get();
 				pushHistory();
-				set({ workGroups: normalizeWorkGroups(workGroups) });
+				// 選択は ID が新データでも生存していれば階層単位で維持する。
+				const wg = cur.selection.workGroupId
+					? next.find((g) => g.Id === cur.selection.workGroupId)
+					: undefined;
+				const w =
+					wg && cur.selection.workId
+						? wg.Works.find((x) => x.Id === cur.selection.workId)
+						: undefined;
+				const t =
+					w && cur.selection.trainId
+						? w.Trains.find((x) => x.Id === cur.selection.trainId)
+						: undefined;
+				set({
+					workGroups: next,
+					selection: {
+						workGroupId: wg?.Id ?? undefined,
+						workId: w?.Id ?? undefined,
+						trainId: t?.Id ?? undefined,
+					},
+				});
 			},
 			resetDocument: () => {
-				pushHistory();
-				set({ workGroups: [], selection: {} });
+				set((s) => ({
+					workGroups: [],
+					selection: {},
+					history: { past: [], future: [] },
+					documentVersion: s.documentVersion + 1,
+				}));
 			},
 			undo: () => {
 				const { history, workGroups } = get();

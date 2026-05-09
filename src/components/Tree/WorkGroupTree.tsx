@@ -4,6 +4,9 @@ import type { WorkGroupData } from "../../types/trvis";
 
 interface Props {
 	workGroups: WorkGroupData[];
+	onEditWorkGroup?: (workGroupId: string) => void;
+	onEditWork?: (workGroupId: string, workId: string) => void;
+	onEditTrain?: (workGroupId: string, workId: string, trainId: string) => void;
 }
 
 interface ContextMenu {
@@ -25,9 +28,30 @@ const rowStyle = (selected: boolean): React.CSSProperties => ({
 	color: selected ? "#fff" : "var(--text)",
 	fontSize: 13,
 	userSelect: "none",
+	flex: 1,
+	minWidth: 0,
+	overflow: "hidden",
 });
 
-export function WorkGroupTree({ workGroups }: Props) {
+const labelTextStyle: React.CSSProperties = {
+	overflow: "hidden",
+	textOverflow: "ellipsis",
+	whiteSpace: "nowrap",
+};
+
+const gearBtnStyle = (selected: boolean): React.CSSProperties => ({
+	border: "none",
+	background: "none",
+	cursor: "pointer",
+	padding: "2px 4px",
+	fontSize: 14,
+	lineHeight: 1,
+	color: selected ? "#fff" : "var(--text-muted)",
+	opacity: selected ? 1 : 0.7,
+	flex: "none",
+});
+
+export function WorkGroupTree({ workGroups, onEditWorkGroup, onEditWork, onEditTrain }: Props) {
 	const {
 		selection,
 		setSelection,
@@ -109,7 +133,7 @@ export function WorkGroupTree({ workGroups }: Props) {
 					<div key={wg.Id}>
 						{/* WorkGroup行 */}
 						<div
-							style={{ display: "flex", alignItems: "center" }}
+							style={{ display: "flex", alignItems: "center", minWidth: 0 }}
 							onContextMenu={(e) => handleCtx(e, "workGroup", wg.Id!, [])}
 						>
 							<span
@@ -120,6 +144,7 @@ export function WorkGroupTree({ workGroups }: Props) {
 									color: "var(--text-muted)",
 									cursor: "pointer",
 									minWidth: 10,
+									flex: "none",
 								}}
 							>
 								{wgExpanded ? "▼" : "▶"}
@@ -128,8 +153,21 @@ export function WorkGroupTree({ workGroups }: Props) {
 								style={rowStyle(wgSelected)}
 								onClick={() => setSelection({ workGroupId: wg.Id ?? undefined })}
 							>
-								<span>📁</span>
-								<span style={{ fontWeight: 600 }}>{wg.Name}</span>
+								<span style={{ flex: "none" }}>📁</span>
+								<span style={{ ...labelTextStyle, fontWeight: 600, flex: 1 }}>{wg.Name}</span>
+								{onEditWorkGroup && (
+									<button
+										type="button"
+										onClick={(e) => {
+											e.stopPropagation();
+											onEditWorkGroup(wg.Id!);
+										}}
+										title="仕業群を編集"
+										style={gearBtnStyle(wgSelected)}
+									>
+										⚙
+									</button>
+								)}
 							</div>
 						</div>
 
@@ -144,7 +182,7 @@ export function WorkGroupTree({ workGroups }: Props) {
 								return (
 									<div key={w.Id} style={{ paddingLeft: 20 }}>
 										<div
-											style={{ display: "flex", alignItems: "center" }}
+											style={{ display: "flex", alignItems: "center", minWidth: 0 }}
 											onContextMenu={(e) => handleCtx(e, "work", w.Id!, [wg.Id!])}
 										>
 											<span
@@ -155,6 +193,7 @@ export function WorkGroupTree({ workGroups }: Props) {
 													color: "var(--text-muted)",
 													cursor: "pointer",
 													minWidth: 10,
+													flex: "none",
 												}}
 											>
 												{wExpanded ? "▼" : "▶"}
@@ -168,8 +207,21 @@ export function WorkGroupTree({ workGroups }: Props) {
 													})
 												}
 											>
-												<span>📋</span>
-												<span>{w.Name}</span>
+												<span style={{ flex: "none" }}>📋</span>
+												<span style={{ ...labelTextStyle, flex: 1 }}>{w.Name}</span>
+												{onEditWork && (
+													<button
+														type="button"
+														onClick={(e) => {
+															e.stopPropagation();
+															onEditWork(wg.Id!, w.Id!);
+														}}
+														title="仕業を編集"
+														style={gearBtnStyle(wSelected)}
+													>
+														⚙
+													</button>
+												)}
 											</div>
 										</div>
 
@@ -183,7 +235,12 @@ export function WorkGroupTree({ workGroups }: Props) {
 												return (
 													<div
 														key={t.Id}
-														style={{ paddingLeft: 20 }}
+														style={{
+															paddingLeft: 20,
+															display: "flex",
+															alignItems: "center",
+															minWidth: 0,
+														}}
 														onContextMenu={(e) => handleCtx(e, "train", t.Id!, [wg.Id!, w.Id!])}
 													>
 														<div
@@ -196,11 +253,24 @@ export function WorkGroupTree({ workGroups }: Props) {
 																})
 															}
 														>
-															<span>🚃</span>
-															<span>
+															<span style={{ flex: "none" }}>🚃</span>
+															<span style={{ ...labelTextStyle, flex: 1 }}>
 																{t.TrainNumber}
 																{t.Destination ? ` → ${t.Destination}` : ""}
 															</span>
+															{onEditTrain && (
+																<button
+																	type="button"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		onEditTrain(wg.Id!, w.Id!, t.Id!);
+																	}}
+																	title="列車を編集"
+																	style={gearBtnStyle(tSelected)}
+																>
+																	⚙
+																</button>
+															)}
 														</div>
 													</div>
 												);
@@ -278,6 +348,17 @@ export function WorkGroupTree({ workGroups }: Props) {
 				>
 					{ctxMenu.type === "workGroup" && (
 						<>
+							{onEditWorkGroup && (
+								<button
+									style={menuItemStyle}
+									onClick={() => {
+										onEditWorkGroup(ctxMenu.id);
+										closeCtx();
+									}}
+								>
+									仕業群を編集...
+								</button>
+							)}
 							<button
 								style={menuItemStyle}
 								onClick={() => {
@@ -304,6 +385,17 @@ export function WorkGroupTree({ workGroups }: Props) {
 					)}
 					{ctxMenu.type === "work" && (
 						<>
+							{onEditWork && (
+								<button
+									style={menuItemStyle}
+									onClick={() => {
+										onEditWork(ctxMenu.parentIds[0], ctxMenu.id);
+										closeCtx();
+									}}
+								>
+									仕業を編集...
+								</button>
+							)}
 							<button
 								style={menuItemStyle}
 								onClick={() => {
@@ -329,19 +421,32 @@ export function WorkGroupTree({ workGroups }: Props) {
 						</>
 					)}
 					{ctxMenu.type === "train" && (
-						<button
-							style={{ ...menuItemStyle, color: "var(--danger)" }}
-							onClick={() => {
-								removeTrain(ctxMenu.parentIds[0], ctxMenu.parentIds[1], ctxMenu.id);
-								setSelection({
-									workGroupId: ctxMenu.parentIds[0],
-									workId: ctxMenu.parentIds[1],
-								});
-								closeCtx();
-							}}
-						>
-							列車を削除
-						</button>
+						<>
+							{onEditTrain && (
+								<button
+									style={menuItemStyle}
+									onClick={() => {
+										onEditTrain(ctxMenu.parentIds[0], ctxMenu.parentIds[1], ctxMenu.id);
+										closeCtx();
+									}}
+								>
+									列車を編集...
+								</button>
+							)}
+							<button
+								style={{ ...menuItemStyle, color: "var(--danger)" }}
+								onClick={() => {
+									removeTrain(ctxMenu.parentIds[0], ctxMenu.parentIds[1], ctxMenu.id);
+									setSelection({
+										workGroupId: ctxMenu.parentIds[0],
+										workId: ctxMenu.parentIds[1],
+									});
+									closeCtx();
+								}}
+							>
+								列車を削除
+							</button>
+						</>
 					)}
 				</div>
 			)}

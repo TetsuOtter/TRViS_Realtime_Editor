@@ -11,14 +11,17 @@ import { WorkForm } from "./Forms/WorkForm";
 import { TrainForm } from "./Forms/TrainForm";
 import { TimetableRowForm } from "./Forms/TimetableRowForm";
 import { TimetableTable } from "./TimetableTable";
-import { MapPanel } from "./MapPanel";
 import { RemoteSelectionBar } from "./RemoteSelectionBar";
 import { RemoteCommandsPanel } from "./RemoteCommandsPanel";
-import { SyncedDataPanel } from "./SyncedDataPanel";
 import { Toolbar } from "./Toolbar";
-import type { TimetableRowData } from "../types/trvis";
+import { Dialog } from "./Dialog";
+import { LocationMapDialog } from "./LocationMapDialog";
 
-type RightTab = "form" | "synced" | "map";
+type EditTarget =
+	| { kind: "workGroup"; workGroupId: string }
+	| { kind: "work"; workGroupId: string; workId: string }
+	| { kind: "train"; workGroupId: string; workId: string; trainId: string }
+	| { kind: "row"; workGroupId: string; workId: string; trainId: string; rowId: string };
 
 export function EditorLayout() {
 	const workGroups = useEditorStore((s) => s.workGroups);
@@ -28,29 +31,59 @@ export function EditorLayout() {
 	const selection = useEditorStore((s) => s.selection);
 
 	const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-	const [rightTab, setRightTab] = useState<RightTab>("form");
+	const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+	const [locationMapOpen, setLocationMapOpen] = useState(false);
 
-	const selectedRow: TimetableRowData | undefined = activeTrain?.TimetableRows.find(
-		(r) => r.Id === selectedRowId,
-	);
+	const closeDialog = () => setEditTarget(null);
 
-	const tabBtn = (tab: RightTab, label: string) => (
-		<button
-			onClick={() => setRightTab(tab)}
-			style={{
-				padding: "4px 12px",
-				fontSize: 12,
-				border: "none",
-				borderBottom: tab === rightTab ? "2px solid var(--accent)" : "2px solid transparent",
-				background: "transparent",
-				color: tab === rightTab ? "var(--accent)" : "var(--text-muted)",
-				cursor: "pointer",
-				fontWeight: tab === rightTab ? 600 : 400,
-			}}
-		>
-			{label}
-		</button>
-	);
+	// Re-resolve the edit target against the current store so dialog inputs
+	// stay in sync with edits committed via the store.
+	const resolveEditTargetData = () => {
+		if (!editTarget) return null;
+		const wg = workGroups.find((g) => g.Id === editTarget.workGroupId);
+		if (!wg) return null;
+		if (editTarget.kind === "workGroup") return { kind: "workGroup" as const, workGroup: wg };
+		const w = wg.Works.find((x) => x.Id === editTarget.workId);
+		if (!w) return null;
+		if (editTarget.kind === "work") return { kind: "work" as const, workGroupId: wg.Id!, work: w };
+		const t = w.Trains.find((x) => x.Id === editTarget.trainId);
+		if (!t) return null;
+		if (editTarget.kind === "train")
+			return {
+				kind: "train" as const,
+				workGroupId: wg.Id!,
+				workId: w.Id!,
+				train: t,
+			};
+		const row = t.TimetableRows.find((x) => x.Id === editTarget.rowId);
+		if (!row) return null;
+		return {
+			kind: "row" as const,
+			workGroupId: wg.Id!,
+			workId: w.Id!,
+			trainId: t.Id!,
+			row,
+		};
+	};
+	const dialogData = resolveEditTargetData();
+
+	const dialogTitle = dialogData
+		? dialogData.kind === "workGroup"
+			? "仕業群を編集"
+			: dialogData.kind === "work"
+				? "仕業を編集"
+				: dialogData.kind === "train"
+					? "列車を編集"
+					: "時刻表行を編集"
+		: "";
+
+	const placeholder = activeWorkGroup
+		? activeWork
+			? "列車を選択してください"
+			: "仕業を選択してください"
+		: workGroups.length === 0
+			? "ツリーから項目を選択してください"
+			: "仕業群を選択してください";
 
 	return (
 		<div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -70,10 +103,19 @@ export function EditorLayout() {
 						overflow: "hidden",
 					}}
 				>
-					<WorkGroupTree workGroups={workGroups} />
+					<WorkGroupTree
+						workGroups={workGroups}
+						onEditWorkGroup={(workGroupId) => setEditTarget({ kind: "workGroup", workGroupId })}
+						onEditWork={(workGroupId, workId) =>
+							setEditTarget({ kind: "work", workGroupId, workId })
+						}
+						onEditTrain={(workGroupId, workId, trainId) =>
+							setEditTarget({ kind: "train", workGroupId, workId, trainId })
+						}
+					/>
 				</div>
 
-				{/* 中央: 時刻表テーブル */}
+				{/* 右(中央): 時刻表テーブル */}
 				<div
 					style={{
 						flex: 1,
@@ -90,6 +132,16 @@ export function EditorLayout() {
 							train={activeTrain}
 							selectedRowId={selectedRowId}
 							onSelectRow={setSelectedRowId}
+							onEditRowDetail={(rowId) =>
+								setEditTarget({
+									kind: "row",
+									workGroupId: selection.workGroupId!,
+									workId: selection.workId!,
+									trainId: activeTrain.Id!,
+									rowId,
+								})
+							}
+							onOpenLocationMap={() => setLocationMapOpen(true)}
 						/>
 					) : (
 						<div
@@ -102,76 +154,35 @@ export function EditorLayout() {
 								fontSize: 14,
 							}}
 						>
-							{activeWorkGroup
-								? activeWork
-									? "列車を選択してください"
-									: "仕業を選択してください"
-								: "仕業群を選択してください"}
+							{placeholder}
 						</div>
 					)}
 				</div>
-
-				{/* 右: フォーム / 同期データ / 地図 */}
-				<div
-					style={{
-						width: 300,
-						minWidth: 260,
-						borderLeft: "1px solid var(--border)",
-						display: "flex",
-						flexDirection: "column",
-						overflow: "hidden",
-					}}
-				>
-					{/* タブ */}
-					<div
-						style={{
-							display: "flex",
-							borderBottom: "1px solid var(--border)",
-							padding: "0 4px",
-							background: "var(--bg-panel)",
-						}}
-					>
-						{tabBtn("form", "プロパティ")}
-						{tabBtn("synced", "同期データ")}
-						{tabBtn("map", "地図")}
-					</div>
-
-					<div style={{ flex: 1, overflowY: "auto" }}>
-						{rightTab === "form" && (
-							<>
-								{selectedRow && selection.workGroupId && selection.workId && selection.trainId ? (
-									<TimetableRowForm
-										workGroupId={selection.workGroupId}
-										workId={selection.workId}
-										trainId={selection.trainId}
-										row={selectedRow}
-									/>
-								) : activeTrain && selection.workGroupId && selection.workId ? (
-									<TrainForm
-										workGroupId={selection.workGroupId}
-										workId={selection.workId}
-										train={activeTrain}
-									/>
-								) : activeWork && selection.workGroupId ? (
-									<WorkForm workGroupId={selection.workGroupId} work={activeWork} />
-								) : activeWorkGroup ? (
-									<WorkGroupForm workGroup={activeWorkGroup} />
-								) : (
-									<div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
-										ツリーから項目を選択してください
-									</div>
-								)}
-							</>
-						)}
-						{rightTab === "synced" && <SyncedDataPanel />}
-						{rightTab === "map" && (
-							<div style={{ height: 400 }}>
-								<MapPanel />
-							</div>
-						)}
-					</div>
-				</div>
 			</div>
+
+			<LocationMapDialog open={locationMapOpen} onClose={() => setLocationMapOpen(false)} />
+
+			<Dialog open={!!dialogData} title={dialogTitle} onClose={closeDialog} width={760}>
+				{dialogData?.kind === "workGroup" && <WorkGroupForm workGroup={dialogData.workGroup} />}
+				{dialogData?.kind === "work" && (
+					<WorkForm workGroupId={dialogData.workGroupId} work={dialogData.work} />
+				)}
+				{dialogData?.kind === "train" && (
+					<TrainForm
+						workGroupId={dialogData.workGroupId}
+						workId={dialogData.workId}
+						train={dialogData.train}
+					/>
+				)}
+				{dialogData?.kind === "row" && (
+					<TimetableRowForm
+						workGroupId={dialogData.workGroupId}
+						workId={dialogData.workId}
+						trainId={dialogData.trainId}
+						row={dialogData.row}
+					/>
+				)}
+			</Dialog>
 		</div>
 	);
 }

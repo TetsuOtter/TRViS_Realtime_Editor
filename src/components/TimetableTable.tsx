@@ -7,9 +7,19 @@ interface Props {
 	train: TrainData;
 	selectedRowId: string | null;
 	onSelectRow: (id: string | null) => void;
+	onEditRowDetail: (rowId: string) => void;
+	onOpenLocationMap: () => void;
 }
 
-export function TimetableTable({ workGroupId, workId, train, selectedRowId, onSelectRow }: Props) {
+export function TimetableTable({
+	workGroupId,
+	workId,
+	train,
+	selectedRowId,
+	onSelectRow,
+	onEditRowDetail,
+	onOpenLocationMap,
+}: Props) {
 	const { addTimetableRow, removeTimetableRow, moveTimetableRow, updateTimetableRow } =
 		useEditorStore();
 
@@ -41,6 +51,7 @@ export function TimetableTable({ workGroupId, workId, train, selectedRowId, onSe
 		value: string | number | null | undefined,
 		onChange: (v: string) => void,
 		width?: number,
+		extraProps?: React.InputHTMLAttributes<HTMLInputElement>,
 	) => (
 		<input
 			value={value ?? ""}
@@ -54,6 +65,7 @@ export function TimetableTable({ workGroupId, workId, train, selectedRowId, onSe
 				fontSize: 12,
 				background: "var(--bg)",
 			}}
+			{...extraProps}
 		/>
 	);
 
@@ -73,23 +85,40 @@ export function TimetableTable({ workGroupId, workId, train, selectedRowId, onSe
 					{train.TrainNumber}
 					{train.Destination ? ` → ${train.Destination}` : ""} ({rows.length}行)
 				</span>
-				<button
-					onClick={() => {
-						const id = addTimetableRow(workGroupId, workId, train.Id!);
-						onSelectRow(id);
-					}}
-					style={{
-						padding: "3px 10px",
-						fontSize: 12,
-						border: "none",
-						borderRadius: 4,
-						background: "var(--accent)",
-						color: "#fff",
-						cursor: "pointer",
-					}}
-				>
-					+ 行追加
-				</button>
+				<div style={{ display: "flex", gap: 6 }}>
+					<button
+						onClick={onOpenLocationMap}
+						style={{
+							padding: "3px 10px",
+							fontSize: 12,
+							border: "1px solid var(--border)",
+							borderRadius: 4,
+							background: "var(--bg)",
+							color: "var(--text)",
+							cursor: "pointer",
+						}}
+						title="位置情報・地図を編集"
+					>
+						📍 位置情報・地図
+					</button>
+					<button
+						onClick={() => {
+							const id = addTimetableRow(workGroupId, workId, train.Id!);
+							onSelectRow(id);
+						}}
+						style={{
+							padding: "3px 10px",
+							fontSize: 12,
+							border: "none",
+							borderRadius: 4,
+							background: "var(--accent)",
+							color: "#fff",
+							cursor: "pointer",
+						}}
+					>
+						+ 行追加
+					</button>
+				</div>
 			</div>
 
 			<div style={{ flex: 1, overflowY: "auto" }}>
@@ -98,13 +127,11 @@ export function TimetableTable({ workGroupId, workId, train, selectedRowId, onSe
 						<tr>
 							<th style={thStyle}>#</th>
 							<th style={thStyle}>駅名</th>
-							<th style={thStyle}>距離(m)</th>
+							<th style={thStyle}>走行(分)</th>
+							<th style={thStyle}>走行(秒)</th>
 							<th style={thStyle}>着</th>
 							<th style={thStyle}>発</th>
 							<th style={thStyle}>番線</th>
-							<th style={thStyle}>通過</th>
-							<th style={thStyle}>緯度</th>
-							<th style={thStyle}>経度</th>
 							<th style={thStyle}>操作</th>
 						</tr>
 					</thead>
@@ -126,12 +153,24 @@ export function TimetableTable({ workGroupId, workId, train, selectedRowId, onSe
 									</td>
 									<td style={tdStyle(sel)}>
 										{inlineInput(
-											row.Location_m,
+											row.DriveTime_MM,
 											(v) =>
 												updateTimetableRow(workGroupId, workId, train.Id!, row.Id!, {
-													Location_m: v === "" ? 0 : Number(v),
+													DriveTime_MM: v === "" ? null : Number(v),
 												}),
-											80,
+											50,
+											{ type: "number", min: 0 },
+										)}
+									</td>
+									<td style={tdStyle(sel)}>
+										{inlineInput(
+											row.DriveTime_SS,
+											(v) =>
+												updateTimetableRow(workGroupId, workId, train.Id!, row.Id!, {
+													DriveTime_SS: v === "" ? null : Number(v),
+												}),
+											50,
+											{ type: "number", min: 0, max: 59 },
 										)}
 									</td>
 									<td style={tdStyle(sel)}>
@@ -165,39 +204,24 @@ export function TimetableTable({ workGroupId, workId, train, selectedRowId, onSe
 										)}
 									</td>
 									<td style={tdStyle(sel)}>
-										<input
-											type="checkbox"
-											checked={row.IsPass === true}
-											onChange={(e) =>
-												updateTimetableRow(workGroupId, workId, train.Id!, row.Id!, {
-													IsPass: e.target.checked ? true : null,
-												})
-											}
-											onClick={(e) => e.stopPropagation()}
-										/>
-									</td>
-									<td style={tdStyle(sel)}>
-										{inlineInput(
-											row.Latitude_deg,
-											(v) =>
-												updateTimetableRow(workGroupId, workId, train.Id!, row.Id!, {
-													Latitude_deg: v === "" ? null : Number(v),
-												}),
-											80,
-										)}
-									</td>
-									<td style={tdStyle(sel)}>
-										{inlineInput(
-											row.Longitude_deg,
-											(v) =>
-												updateTimetableRow(workGroupId, workId, train.Id!, row.Id!, {
-													Longitude_deg: v === "" ? null : Number(v),
-												}),
-											80,
-										)}
-									</td>
-									<td style={tdStyle(sel)}>
 										<div style={{ display: "flex", gap: 4 }}>
+											<button
+												onClick={(e) => {
+													e.stopPropagation();
+													onSelectRow(row.Id ?? null);
+													onEditRowDetail(row.Id!);
+												}}
+												style={{
+													border: "none",
+													background: "none",
+													cursor: "pointer",
+													padding: 2,
+													color: "var(--accent)",
+												}}
+												title="詳細を編集"
+											>
+												⚙
+											</button>
 											<button
 												onClick={(e) => {
 													e.stopPropagation();

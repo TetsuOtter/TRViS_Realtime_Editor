@@ -109,14 +109,14 @@ export function WorkForm({ workGroupId, work }: Props) {
 				/>
 			</Field>
 
-			<Field label="電子時刻表あり">
+			<Field label="横向き時刻表あり">
 				<NullableBoolean
 					value={work.HasETrainTimetable}
 					onChange={(v) => upd({ HasETrainTimetable: v })}
 				/>
 			</Field>
 
-			<Field label="電子時刻表コンテンツタイプ">
+			<Field label="横向き時刻表コンテンツタイプ">
 				<input
 					type="number"
 					value={work.ETrainTimetableContentType ?? ""}
@@ -130,7 +130,7 @@ export function WorkForm({ workGroupId, work }: Props) {
 				/>
 			</Field>
 
-			<Field label="電子時刻表コンテンツ">
+			<Field label="横向き時刻表コンテンツ">
 				<textarea
 					value={work.ETrainTimetableContent ?? ""}
 					onChange={(e) => upd({ ETrainTimetableContent: e.target.value || null })}

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { broadcastAllWorkGroups, broadcastWorkGroup } from "../api/wsServer";
+import { broadcastAllWorkGroups, broadcastWorkGroup, subscribeWsEvents } from "../api/wsServer";
 import { useEditorStore } from "./editorStore";
 
 const DEBOUNCE_MS = 300;
@@ -22,17 +22,17 @@ export function useAutoBroadcast() {
 	const inflightRef = useRef(false);
 
 	useEffect(() => {
-		const schedule = () => {
+		const schedule = (force = false) => {
 			if (timerRef.current) clearTimeout(timerRef.current);
 			timerRef.current = setTimeout(async () => {
 				timerRef.current = null;
 				if (inflightRef.current) {
-					schedule();
+					schedule(force);
 					return;
 				}
 				const { liveBroadcast, workGroups, selection } = useEditorStore.getState();
 				if (!liveBroadcast) return;
-				if (lastBroadcastRef.current === workGroups) return;
+				if (!force && lastBroadcastRef.current === workGroups) return;
 				lastBroadcastRef.current = workGroups;
 				inflightRef.current = true;
 				try {
@@ -60,8 +60,22 @@ export function useAutoBroadcast() {
 			}
 		});
 
+		// クライアント新規接続時に、ライブモードなら現在のドキュメントを再配信。
+		// 既存の `lastBroadcastRef` は同一 workGroups 参照だと送信をスキップするので
+		// `force` フラグで強制送信する。
+		let unsubWs: (() => void) | undefined;
+		(async () => {
+			unsubWs = await subscribeWsEvents((ev) => {
+				if (ev.type !== "client-connected") return;
+				const { liveBroadcast } = useEditorStore.getState();
+				if (!liveBroadcast) return;
+				schedule(true);
+			});
+		})();
+
 		return () => {
 			unsub();
+			unsubWs?.();
 			if (timerRef.current) clearTimeout(timerRef.current);
 		};
 	}, []);

@@ -4,6 +4,17 @@ import { setSyncedData as apiSetSyncedData } from "../api/wsServer";
 
 const BROADCAST_INTERVAL_MS = 1000;
 
+/** ローカル時刻の 0時からの経過 ms。TRViS の `Time_ms` 規約に従う。 */
+function localMillisOfDay(): number {
+	const d = new Date();
+	return (
+		d.getHours() * 3_600_000 +
+		d.getMinutes() * 60_000 +
+		d.getSeconds() * 1000 +
+		d.getMilliseconds()
+	);
+}
+
 interface Props {
 	compact?: boolean;
 }
@@ -14,15 +25,46 @@ export function SyncedDataPanel({ compact = false }: Props = {}) {
 	const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	const broadcast = async () => {
-		const timeMs = autoTimeMs ? Date.now() % 86400000 : (syncedData.Time_ms ?? 0);
+		// auto モードのときはサーバ側で wall-clock 由来の Time_ms を再計算するので、
+		// ここで渡す値は無視される (Tauri の型を満たすために 0 を渡しておく)。
+		const timeMs = autoTimeMs ? 0 : (syncedData.Time_ms ?? 0);
 		try {
 			await apiSetSyncedData({
 				locationM: syncedData.Location_m,
 				timeMs,
 				canStart: syncedData.CanStart ?? false,
+				autoTimeMs,
 			});
 		} catch {
 			// Tauri環境でなければ何もしない
+		}
+	};
+
+	/**
+	 * 配信停止時、サーバの再送タイマが auto_time_ms=true のキャッシュを参照し続けて
+	 * 「停止後も時刻が進み続ける」状態にならないよう、停止直前のローカル時刻を
+	 * `auto_time_ms=false` で書き戻し、サーバ側の再送値を凍結する。
+	 */
+	const freezeBroadcast = async () => {
+		const timeMs = autoTimeMs ? localMillisOfDay() : (syncedData.Time_ms ?? 0);
+		try {
+			await apiSetSyncedData({
+				locationM: syncedData.Location_m,
+				timeMs,
+				canStart: syncedData.CanStart ?? false,
+				autoTimeMs: false,
+			});
+		} catch {
+			// Tauri環境でなければ何もしない
+		}
+	};
+
+	const toggleBroadcasting = () => {
+		if (broadcasting) {
+			void freezeBroadcast();
+			setBroadcasting(false);
+		} else {
+			setBroadcasting(true);
 		}
 	};
 
@@ -127,7 +169,7 @@ export function SyncedDataPanel({ compact = false }: Props = {}) {
 				</div>
 				<div style={{ display: "flex", gap: 4 }}>
 					<button
-						onClick={() => setBroadcasting((v) => !v)}
+						onClick={toggleBroadcasting}
 						style={{
 							padding: "3px 10px",
 							border: "none",
@@ -226,9 +268,7 @@ export function SyncedDataPanel({ compact = false }: Props = {}) {
 
 				<div style={{ display: "flex", gap: 8, marginTop: 4 }}>
 					<button
-						onClick={() => {
-							setBroadcasting((v) => !v);
-						}}
+						onClick={toggleBroadcasting}
 						style={{
 							padding: "5px 14px",
 							border: "none",

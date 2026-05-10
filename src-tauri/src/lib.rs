@@ -6,9 +6,9 @@ use serde_json::Value;
 use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use trvis_ws_server::{
-	start, DiagramInfoMessage, HeaderColorMessage, NotificationMessage, OperationCommandMessage,
-	OutboundMessage, SelectTrainMessage, ServerEvent, ServerHandle, ServerInfoMessage, ServerOptions,
-	ServerSyncedDataMessage, ServerTimetableMessage, TimeFormatMessage,
+	start, CachedSyncedData, DiagramInfoMessage, HeaderColorMessage, NotificationMessage,
+	OperationCommandMessage, OutboundMessage, SelectTrainMessage, ServerEvent, ServerHandle,
+	ServerInfoMessage, ServerOptions, ServerTimetableMessage, TimeFormatMessage,
 };
 
 #[derive(Default)]
@@ -247,20 +247,32 @@ async fn broadcast_diagram_info(
 }
 
 /// SyncedData の最新値を更新し、即時送信する。
+///
+/// `auto_time_ms = true` のときはサーバ側で再送毎に wall-clock 由来の `Time_ms` を
+/// 計算するため、UI から渡された `time_ms` は無視され、`location_m` / `can_start` の
+/// 更新と「自動時刻モードを有効にする」というシグナルだけが効く。これにより、
+/// UI 側の broadcast 周期 (1s) とサーバの再送タイマ (250ms) のズレで同じ秒が
+/// 重複送信される問題を防ぐ。
 #[tauri::command]
 async fn set_synced_data(
 	state: State<'_, AppState>,
 	location_m: Option<f64>,
 	time_ms: i64,
 	can_start: bool,
+	auto_time_ms: bool,
 ) -> Result<(), String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
-	let msg = ServerSyncedDataMessage::new(location_m, time_ms, can_start);
-	handle.set_latest_sync(Some(msg.clone())).await;
+	let cached = CachedSyncedData {
+		location_m,
+		time_ms,
+		can_start,
+		auto_time_ms,
+	};
+	handle.set_latest_sync(Some(cached.clone())).await;
 	handle
 		.state
-		.broadcast(OutboundMessage::SyncedData(msg))
+		.broadcast(OutboundMessage::SyncedData(cached.materialize()))
 		.await;
 	Ok(())
 }

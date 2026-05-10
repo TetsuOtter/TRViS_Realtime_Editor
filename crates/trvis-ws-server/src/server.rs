@@ -23,7 +23,8 @@ use tokio_tungstenite::tungstenite::Message;
 use uuid::Uuid;
 
 use crate::messages::{
-	ClientIdUpdateMessage, OutboundMessage, ServerSyncedDataMessage, ServerTimetableMessage,
+	CachedSyncedData, ClientIdUpdateMessage, OutboundMessage, ServerSyncedDataMessage,
+	ServerTimetableMessage,
 };
 use crate::state::{ClientState, ServerEvent, SharedState};
 
@@ -51,8 +52,9 @@ pub struct ServerHandle {
 	pub bound_port: u16,
 	/// 接続直後に送る Timetable メッセージのキャッシュ。
 	pub initial_timetable: Arc<Mutex<Option<ServerTimetableMessage>>>,
-	/// 最新の SyncedData。`None` なら送信しない。
-	pub latest_sync: Arc<Mutex<Option<ServerSyncedDataMessage>>>,
+	/// 最新の SyncedData (送信前のキャッシュ)。`None` なら送信しない。
+	/// `auto_time_ms = true` の場合、`time_ms` は再送毎に wall-clock で上書きされる。
+	pub latest_sync: Arc<Mutex<Option<CachedSyncedData>>>,
 	shutdown_tx: mpsc::Sender<()>,
 }
 
@@ -65,8 +67,8 @@ impl ServerHandle {
 		*self.initial_timetable.lock().await = msg;
 	}
 
-	pub async fn set_latest_sync(&self, msg: Option<ServerSyncedDataMessage>) {
-		*self.latest_sync.lock().await = msg;
+	pub async fn set_latest_sync(&self, cached: Option<CachedSyncedData>) {
+		*self.latest_sync.lock().await = cached;
 	}
 
 	pub async fn broadcast_timetable(&self, msg: ServerTimetableMessage) {
@@ -88,7 +90,7 @@ pub async fn start(options: ServerOptions) -> Result<ServerHandle> {
 
 	let state = SharedState::new();
 	let initial_timetable = Arc::new(Mutex::new(None::<ServerTimetableMessage>));
-	let latest_sync = Arc::new(Mutex::new(None::<ServerSyncedDataMessage>));
+	let latest_sync = Arc::new(Mutex::new(None::<CachedSyncedData>));
 	let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<()>(1);
 
 	let _ = state.events.send(ServerEvent::Started {
@@ -160,7 +162,7 @@ async fn handle_connection(
 	stream: TcpStream,
 	peer: SocketAddr,
 	initial_timetable: Arc<Mutex<Option<ServerTimetableMessage>>>,
-	latest_sync: Arc<Mutex<Option<ServerSyncedDataMessage>>>,
+	latest_sync: Arc<Mutex<Option<CachedSyncedData>>>,
 	sync_interval: Option<Duration>,
 ) -> Result<()> {
 	let _ = peer;
@@ -229,7 +231,8 @@ async fn handle_connection(
 			loop {
 				ticker.tick().await;
 				let snapshot = latest_sync.lock().await.clone();
-				if let Some(msg) = snapshot {
+				if let Some(cached) = snapshot {
+					let msg = cached.materialize();
 					if outbound_tx.send(OutboundMessage::SyncedData(msg)).is_err() {
 						break;
 					}

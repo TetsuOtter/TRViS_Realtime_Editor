@@ -1,6 +1,11 @@
 import { useEffect, useRef } from "react";
 
-import { broadcastAllWorkGroups, broadcastWorkGroup, subscribeWsEvents } from "../api/wsServer";
+import {
+	broadcastAllWorkGroups,
+	broadcastWorkGroup,
+	sendInitialTimetableTo,
+	subscribeWsEvents,
+} from "../api/wsServer";
 import { useEditorStore } from "./editorStore";
 
 const DEBOUNCE_MS = 300;
@@ -15,6 +20,10 @@ const DEBOUNCE_MS = 300;
  * ため、選択中の WorkGroup がある場合は WorkGroup スコープで配信し、
  * 選択が無い (= TRViS が表示中の WorkGroup を特定できない) 場合のみ
  * `Scope.All` にフォールバックする。
+ *
+ * 新規クライアント接続時は、その 1 クライアントだけに `Scope.All` の初期スナップショットを
+ * 送る (既存クライアントの選択列車・駅 index・位置情報をリセットしないため、
+ * `broadcast_timetable` ではなく `send_initial_timetable_to` を使う)。
  */
 export function useAutoBroadcast() {
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,16 +69,14 @@ export function useAutoBroadcast() {
 			}
 		});
 
-		// クライアント新規接続時に、ライブモードなら現在のドキュメントを再配信。
-		// 既存の `lastBroadcastRef` は同一 workGroups 参照だと送信をスキップするので
-		// `force` フラグで強制送信する。
 		let unsubWs: (() => void) | undefined;
 		(async () => {
 			unsubWs = await subscribeWsEvents((ev) => {
 				if (ev.type !== "client-connected") return;
-				const { liveBroadcast } = useEditorStore.getState();
-				if (!liveBroadcast) return;
-				schedule(true);
+				const { workGroups } = useEditorStore.getState();
+				sendInitialTimetableTo(ev.clientId, workGroups).catch((e) => {
+					console.error("sendInitialTimetableTo failed:", e);
+				});
 			});
 		})();
 

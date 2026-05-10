@@ -79,14 +79,43 @@ async fn broadcast_timetable(
 ) -> Result<(), String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let is_scope_all = work_group_id.is_none() && work_id.is_none() && train_id.is_none();
 	let msg = ServerTimetableMessage::new_scoped(work_group_id, work_id, train_id, data);
-	// 接続後に来た新規クライアントにも届くように initial を更新
-	handle.set_initial_timetable(Some(msg.clone())).await;
+	// 新規接続クライアントには「全データ」を渡したいので、Scope.All の送信時のみ
+	// initial キャッシュを更新する。Scope.WorkGroup などの部分更新で上書きすると、
+	// 後から繋いだクライアントが 1 WorkGroup しか受け取れない (#接続時全配信) 不具合になる。
+	if is_scope_all {
+		handle.set_initial_timetable(Some(msg.clone())).await;
+	}
 	handle
 		.state
 		.broadcast(OutboundMessage::Timetable(msg))
 		.await;
 	Ok(())
+}
+
+/// 指定クライアントだけに `Scope.All` の `Timetable` メッセージを送る。
+/// 新規接続イベントを受けてエディタが現在の全 WorkGroup を流し直すために使う。
+/// 既存クライアントの選択列車・駅 index・位置情報をリセットしたくないので
+/// `broadcast_timetable` ではなくこちらを使う。
+/// 戻り値は送信に成功したかどうか (false = 送信先クライアントが既に切断されている)。
+#[tauri::command]
+async fn send_initial_timetable_to(
+	state: State<'_, AppState>,
+	client_id: String,
+	data: Value,
+) -> Result<bool, String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = ServerTimetableMessage::new_all(data);
+	// 後続クライアントの接続時 initial としても使えるよう、最新の全データキャッシュを更新する。
+	handle.set_initial_timetable(Some(msg.clone())).await;
+	Ok(
+		handle
+			.state
+			.send_to(&client_id, OutboundMessage::Timetable(msg))
+			.await,
+	)
 }
 
 /// 全クライアントへ `SelectTrain` メッセージを送る (TRViS で表示中の列車を切り替える指示)。
@@ -364,6 +393,7 @@ pub fn run() {
 			start_server,
 			stop_server,
 			broadcast_timetable,
+			send_initial_timetable_to,
 			broadcast_select_train,
 			broadcast_operation_command,
 			broadcast_header_color,

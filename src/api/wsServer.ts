@@ -78,6 +78,23 @@ export async function broadcastAllWorkGroups(workGroups: WorkGroupData[]): Promi
 	});
 }
 
+/**
+ * 指定クライアントだけに `Scope.All` の Timetable を送る。
+ * 新規接続クライアントへの初期配信に使う (既存クライアントの選択・位置情報を巻き戻さない)。
+ * 送信先がすでに切断されていた場合は false。
+ */
+export async function sendInitialTimetableTo(
+	clientId: string,
+	workGroups: WorkGroupData[],
+): Promise<boolean> {
+	const t = await loadTauri();
+	if (!t) return false;
+	return t.invoke<boolean>("send_initial_timetable_to", {
+		clientId,
+		data: workGroups,
+	});
+}
+
 /** 単一 WorkGroup を `Scope.WorkGroup` で送信。 */
 export async function broadcastWorkGroup(workGroup: WorkGroupData): Promise<void> {
 	const t = await loadTauri();

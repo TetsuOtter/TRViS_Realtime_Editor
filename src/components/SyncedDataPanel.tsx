@@ -8,10 +8,7 @@ const BROADCAST_INTERVAL_MS = 1000;
 function localMillisOfDay(): number {
 	const d = new Date();
 	return (
-		d.getHours() * 3_600_000 +
-		d.getMinutes() * 60_000 +
-		d.getSeconds() * 1000 +
-		d.getMilliseconds()
+		d.getHours() * 3_600_000 + d.getMinutes() * 60_000 + d.getSeconds() * 1000 + d.getMilliseconds()
 	);
 }
 

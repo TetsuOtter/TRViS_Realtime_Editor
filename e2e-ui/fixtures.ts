@@ -87,6 +87,7 @@ export async function installTauriStub(page: Page, opts: InstallStubOptions = {}
 							location_m: (args as { locationM?: number | null })?.locationM ?? null,
 							time_ms: (args as { timeMs?: number })?.timeMs ?? 0,
 							can_start: (args as { canStart?: boolean })?.canStart ?? true,
+							auto_time_ms: (args as { autoTimeMs?: boolean })?.autoTimeMs ?? false,
 						});
 					default:
 						return Promise.resolve();

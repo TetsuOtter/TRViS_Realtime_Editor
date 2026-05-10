@@ -266,6 +266,13 @@ export async function setSyncedData(args: {
 	locationM: number | null;
 	timeMs: number;
 	canStart: boolean;
+	/**
+	 * `true` の場合、サーバが各クライアントへの再送タイミング (~250ms) で
+	 * `Time_ms` を wall-clock 由来で都度上書きする。受信側で同じ秒が止まって
+	 * 突然ジャンプする現象を避けるための flag。`timeMs` は無視されるが、
+	 * Tauri 側で型を揃えるためそのまま渡す。
+	 */
+	autoTimeMs: boolean;
 }): Promise<void> {
 	const t = await loadTauri();
 	if (!t) return;
@@ -273,6 +280,7 @@ export async function setSyncedData(args: {
 		locationM: args.locationM,
 		timeMs: args.timeMs,
 		canStart: args.canStart,
+		autoTimeMs: args.autoTimeMs,
 	});
 }
 

@@ -21,7 +21,7 @@ use axum::{Json, Router};
 use clap::Parser;
 use serde::Deserialize;
 use trvis_ws_server::{
-	start, OutboundMessage, ServerOptions, ServerSyncedDataMessage, ServerTimetableMessage,
+	start, CachedSyncedData, OutboundMessage, ServerOptions, ServerTimetableMessage,
 };
 
 #[derive(Parser, Debug)]
@@ -58,6 +58,8 @@ enum StdinCommand {
 		location_m: Option<f64>,
 		time_ms: i64,
 		can_start: bool,
+		#[serde(default)]
+		auto_time_ms: bool,
 	},
 	Shutdown,
 }
@@ -173,10 +175,18 @@ async fn dispatch_command(h: SharedHandle, cmd: StdinCommand) {
 			location_m,
 			time_ms,
 			can_start,
+			auto_time_ms,
 		} => {
-			let msg = ServerSyncedDataMessage::new(location_m, time_ms, can_start);
-			h.set_latest_sync(Some(msg.clone())).await;
-			h.state.broadcast(OutboundMessage::SyncedData(msg)).await;
+			let cached = CachedSyncedData {
+				location_m,
+				time_ms,
+				can_start,
+				auto_time_ms,
+			};
+			h.set_latest_sync(Some(cached.clone())).await;
+			h.state
+				.broadcast(OutboundMessage::SyncedData(cached.materialize()))
+				.await;
 		}
 		StdinCommand::Shutdown => {
 			h.shutdown().await;

@@ -41,6 +41,43 @@ impl ServerSyncedDataMessage {
 	}
 }
 
+/// サーバ内に保持する SyncedData の最新スナップショット。
+///
+/// `auto_time_ms = true` のとき、`time_ms` フィールドは無視され、
+/// `materialize()` 呼び出し時のローカル時刻 (現地の 0時からの経過 ms) で
+/// 都度上書きされる。これにより、UI 側が一定間隔で更新を打たなくても、
+/// 各クライアントの再送タイマが常に新しい時刻を載せて再ブロードキャストできる
+/// (= 受信側で同じ秒数が止まって突然ジャンプする現象を抑止する)。
+#[derive(Debug, Clone)]
+pub struct CachedSyncedData {
+	pub location_m: Option<f64>,
+	pub time_ms: i64,
+	pub can_start: bool,
+	pub auto_time_ms: bool,
+}
+
+impl CachedSyncedData {
+	pub fn materialize(&self) -> ServerSyncedDataMessage {
+		let time_ms = if self.auto_time_ms {
+			current_local_millis_of_day()
+		} else {
+			self.time_ms
+		};
+		ServerSyncedDataMessage::new(self.location_m, time_ms, self.can_start)
+	}
+}
+
+/// ローカル時刻の 0時からの経過 ms を返す。
+/// TRViS 側 (`SyncedData.Time_ms`) はローカル時刻ベースなので、ここでも UTC では
+/// なくサーバホストのローカルタイムゾーンに合わせる。
+fn current_local_millis_of_day() -> i64 {
+	use chrono::{Local, Timelike};
+	let now = Local::now();
+	let secs = i64::from(now.num_seconds_from_midnight());
+	let ms = i64::from(now.nanosecond() / 1_000_000);
+	secs * 1000 + ms
+}
+
 /// サーバ → クライアント の Timetable メッセージ。
 /// `Data` には Scope に応じて `WorkGroupData[]` / `WorkGroupData` / `WorkData` / `TrainData` のいずれかが入る。
 /// 本サーバは UI から渡される値を素通しするため、`Value` で持つ。

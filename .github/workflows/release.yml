@@ -41,6 +41,8 @@ jobs:
   build:
     name: Build & publish release
     needs: create-tag
+    permissions:
+      contents: write
     uses: ./.github/workflows/tauri-build.yml
     with:
       tag_name: ${{ inputs.version }}

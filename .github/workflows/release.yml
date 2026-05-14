@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "リリースバージョン (例: v1.2.3)"
+        required: true
+        type: string
+
+jobs:
+  create-tag:
+    name: Create release tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate version format
+        run: |
+          if ! echo "${{ inputs.version }}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "バージョン形式が不正です。v1.2.3 の形式で指定してください。" >&2
+            exit 1
+          fi
+
+      - name: Require main branch
+        run: |
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            echo "release workflow は main ブランチからのみ実行できます (現在: ${{ github.ref_name }})" >&2
+            exit 1
+          fi
+
+      - name: Create and push tag
+        run: |
+          git tag "${{ inputs.version }}"
+          git push origin "${{ inputs.version }}"
+
+  # GITHUB_TOKEN によるタグプッシュは他ワークフローをトリガーしないため、
+  # workflow_call で tauri-build.yml を直接呼び出してリリースビルドを起動する。
+  build:
+    name: Build & publish release
+    needs: create-tag
+    uses: ./.github/workflows/tauri-build.yml
+    with:
+      tag_name: ${{ inputs.version }}
+    secrets: inherit

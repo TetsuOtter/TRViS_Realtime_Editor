@@ -7,6 +7,13 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag_name:
+        description: "リリースタグ名 (例: v1.2.3)"
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: tauri-${{ github.workflow }}-${{ github.ref }}
@@ -16,6 +23,8 @@ jobs:
   build:
     name: ${{ matrix.platform.os }}
     runs-on: ${{ matrix.platform.runner }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -66,11 +75,24 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # タグ push 経由 (refs/tags/v*) と workflow_call 経由 (inputs.tag_name) の両方に対応し
+      # 後続ステップで参照できる共通の出力値を作る。
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          TAG_FROM_REF: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+          TAG_FROM_INPUT: ${{ inputs.tag_name || '' }}
+        run: |
+          TAG="${TAG_FROM_REF:-$TAG_FROM_INPUT}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          [ -n "$TAG" ] && echo "is_release=true" >> "$GITHUB_OUTPUT" || echo "is_release=false" >> "$GITHUB_OUTPUT"
+
       # 非タグビルド (PR / main push / 手動実行) では tauri.conf.json の version を
       # `0.1.<run_number>` 形式で上書きし、生成バンドルの内部バージョンが固定値
       # 0.1.0 のままにならないようにする。
       - name: Stamp dev version (non-tag builds)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        if: steps.release.outputs.is_release == 'false'
         shell: bash
         env:
           RUN_NUMBER: ${{ github.run_number }}
@@ -90,12 +112,14 @@ jobs:
       # tauri.conf.json と src-tauri/Cargo.toml の両方に書き込む。
       # これにより release.yml でコミットを作らなくてもアプリ内バージョンが正しく表示される。
       - name: Stamp release version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.release.outputs.is_release == 'true'
         shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           node -e "
             const fs = require('fs');
-            const semver = process.env.GITHUB_REF_NAME.replace(/^v/, '');
+            const semver = process.env.RELEASE_TAG.replace(/^v/, '');
 
             const confPath = 'src-tauri/tauri.conf.json';
             const conf = JSON.parse(fs.readFileSync(confPath, 'utf8'));
@@ -117,8 +141,8 @@ jobs:
           GIT_COMMIT: ${{ github.sha }}
         with:
           args: --target ${{ matrix.platform.target }}
-          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
-          releaseName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+          tagName: ${{ steps.release.outputs.tag }}
+          releaseName: ${{ steps.release.outputs.tag }}
           releaseDraft: true
           prerelease: false
 

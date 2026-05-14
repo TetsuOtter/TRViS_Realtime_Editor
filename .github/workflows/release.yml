@@ -35,3 +35,13 @@ jobs:
         run: |
           git tag "${{ inputs.version }}"
           git push origin "${{ inputs.version }}"
+
+  # GITHUB_TOKEN によるタグプッシュは他ワークフローをトリガーしないため、
+  # workflow_call で tauri-build.yml を直接呼び出してリリースビルドを起動する。
+  build:
+    name: Build & publish release
+    needs: create-tag
+    uses: ./.github/workflows/tauri-build.yml
+    with:
+      tag_name: ${{ inputs.version }}
+    secrets: inherit

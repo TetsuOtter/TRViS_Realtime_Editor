@@ -34,7 +34,7 @@
 	"dependencies": {
 		"@codemirror/commands": "^6.10.3",
 		"@codemirror/lang-json": "^6.0.2",
-		"@codemirror/lint": "6.9.5",
+		"@codemirror/lint": "6.9.6",
 		"@codemirror/state": "^6.6.0",
 		"@codemirror/view": "6.41.1",
 		"@tauri-apps/api": "^2.11.0",
@@ -84,7 +84,7 @@
 	"pnpm": {
 		"overrides": {
 			"@codemirror/view": "6.41.1",
-			"@codemirror/lint": "6.9.5",
+			"@codemirror/lint": "6.9.6",
 			"zustand": "5.0.12",
 			"@tauri-apps/cli": "2.11.0",
 			"immer": "11.1.4",

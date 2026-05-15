@@ -29,8 +29,8 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          # macOS は Apple Silicon (arm64) のみ
-          - { os: macos-arm64, runner: macos-latest, target: aarch64-apple-darwin }
+          # macOS: Intel + Apple Silicon の両方を含むユニバーサルバイナリ
+          - { os: macos-universal, runner: macos-latest, target: universal-apple-darwin }
 
           # Linux: x86_64 / aarch64 の 2 ターゲット
           - { os: linux-x64, runner: ubuntu-24.04, target: x86_64-unknown-linux-gnu }
@@ -54,7 +54,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform.target }}
+          # universal-apple-darwin は lipo で2つのスライスを合成するため両ターゲットを要する
+          targets: ${{ matrix.platform.target == 'universal-apple-darwin' && 'aarch64-apple-darwin,x86_64-apple-darwin' || matrix.platform.target }}
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -132,6 +133,14 @@ jobs:
 
             console.log('stamped release version:', semver);
           "
+
+      # macOS 向けビルドの最低 OS バージョンを設定する。
+      # x86_64 スライス: macOS 10.13 (High Sierra) 以降を対象とする。
+      # arm64 スライス: Apple Silicon Mac は macOS 11.0 以降でのみ動作するため
+      #                 10.13 に設定しても実害はなく、ユニバーサルバイナリの結合に影響しない。
+      - name: Set macOS minimum deployment target
+        if: startsWith(matrix.platform.os, 'macos')
+        run: echo "MACOSX_DEPLOYMENT_TARGET=10.13" >> "$GITHUB_ENV"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

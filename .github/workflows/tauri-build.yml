@@ -29,8 +29,9 @@ jobs:
       fail-fast: false
       matrix:
         platform:
-          # macOS は Apple Silicon (arm64) のみ
-          - { os: macos-arm64, runner: macos-latest, target: aarch64-apple-darwin }
+          # macOS: 1 ジョブで universal → arm64 → x64 を順にビルド
+          # universal ビルドで生成された Rust キャッシュを arm64/x64 が再利用し総実行時間を短縮する
+          - { os: macos, runner: macos-latest }
 
           # Linux: x86_64 / aarch64 の 2 ターゲット
           - { os: linux-x64, runner: ubuntu-24.04, target: x86_64-unknown-linux-gnu }
@@ -54,7 +55,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform.target }}
+          # macOS は universal / arm64 / x64 の 3 ターゲットをビルドするため両アーキテクチャを要する
+          targets: ${{ matrix.platform.os == 'macos' && 'aarch64-apple-darwin,x86_64-apple-darwin' || matrix.platform.target }}
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -133,20 +135,81 @@ jobs:
             console.log('stamped release version:', semver);
           "
 
+      # macOS 向けビルドの最低 OS バージョンを設定する。
+      # x86_64 スライス: macOS 10.13 (High Sierra) 以降を対象とする。
+      # arm64 スライス: Apple Silicon Mac は macOS 11.0 以降でのみ動作するため
+      #                 10.13 に設定しても実害はなく、ユニバーサルバイナリの結合に影響しない。
+      - name: Set macOS minimum deployment target
+        if: startsWith(matrix.platform.os, 'macos')
+        run: echo "MACOSX_DEPLOYMENT_TARGET=10.13" >> "$GITHUB_ENV"
+
+      # macOS: universal → arm64 → x64 の順にビルド。
+      # universal ビルドで Rust コンパイル済み成果物が生成されるため、
+      # arm64 / x64 の単体ビルドは bundle 生成のみで高速に完了する。
+      - name: Build Tauri app (macOS universal)
+        if: matrix.platform.os == 'macos'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_COMMIT: ${{ github.sha }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          args: --target universal-apple-darwin
+          tagName: ${{ steps.release.outputs.tag }}
+          releaseName: ${{ steps.release.outputs.tag }}
+          releaseDraft: true
+          prerelease: false
+
+      - name: Build Tauri app (macOS arm64)
+        if: matrix.platform.os == 'macos'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_COMMIT: ${{ github.sha }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          args: --target aarch64-apple-darwin
+          tagName: ${{ steps.release.outputs.tag }}
+          releaseName: ${{ steps.release.outputs.tag }}
+          releaseDraft: true
+          prerelease: false
+
+      - name: Build Tauri app (macOS x64)
+        if: matrix.platform.os == 'macos'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_COMMIT: ${{ github.sha }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          args: --target x86_64-apple-darwin
+          tagName: ${{ steps.release.outputs.tag }}
+          releaseName: ${{ steps.release.outputs.tag }}
+          releaseDraft: true
+          prerelease: false
+
       - name: Build Tauri app
+        if: matrix.platform.os != 'macos'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # build.rs がこの値を `cargo:rustc-env=GIT_COMMIT=...` で実行バイナリに埋め込む。
           GIT_COMMIT: ${{ github.sha }}
-          # macOS コード署名 (Developer ID Application 証明書)
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          # macOS notarization (app-specific password)
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           args: --target ${{ matrix.platform.target }}
           tagName: ${{ steps.release.outputs.tag }}
@@ -155,7 +218,18 @@ jobs:
           prerelease: false
 
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && matrix.platform.os == 'macos'
+        with:
+          name: tauri-macos
+          path: |
+            target/universal-apple-darwin/release/bundle/**/*
+            target/aarch64-apple-darwin/release/bundle/**/*
+            target/x86_64-apple-darwin/release/bundle/**/*
+          if-no-files-found: ignore
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || (github.ref == 'refs/heads/main' && 7) || 14 }}
+
+      - uses: actions/upload-artifact@v7
+        if: always() && matrix.platform.os != 'macos'
         with:
           name: tauri-${{ matrix.platform.os }}
           path: |

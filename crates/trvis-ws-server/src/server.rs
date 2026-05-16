@@ -26,7 +26,7 @@ use crate::messages::{
 	CachedSyncedData, ClientIdUpdateMessage, OutboundMessage, ServerSyncedDataMessage,
 	ServerTimetableMessage,
 };
-use crate::state::{ClientState, ServerEvent, SharedState};
+use crate::state::{ClientState, MonitorDirection, ServerEvent, SharedState};
 
 #[derive(Debug, Clone)]
 pub struct ServerOptions {
@@ -210,6 +210,7 @@ async fn handle_connection(
 						continue;
 					}
 				};
+				state.emit_monitor(MonitorDirection::Out, &client_id, || json.clone());
 				if let Err(e) = ws_sink.send(Message::Text(json.into())).await {
 					let _ = state.events.send(ServerEvent::Error {
 						message: format!("send error to {client_id}: {e}"),
@@ -257,6 +258,9 @@ async fn handle_connection(
 
 		match message {
 			Message::Text(text) => {
+				state.emit_monitor(MonitorDirection::In, &client_id, || {
+					text.as_str().to_string()
+				});
 				process_client_text(&state, &client_id, text.as_str()).await;
 			}
 			Message::Close(_) => break,

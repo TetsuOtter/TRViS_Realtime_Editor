@@ -253,6 +253,23 @@ export interface EditorDiagramInfo {
 	WorkGroupIds: string[];
 }
 
+/** 通信モニタが観測した 1 フレーム (実際にワイヤを流れた生 JSON 文字列)。 */
+export interface MonitorFrame {
+	/** 受信(in) / 送信(out) */
+	direction: "in" | "out";
+	/** 対象クライアントの内部 ID */
+	clientId: string;
+	/** ワイヤを流れた生のテキスト (整形しない) */
+	json: string;
+	/** UNIX epoch ミリ秒 (Rust 側で観測時刻を採番) */
+	ts: number;
+}
+
+/** Tauri の `ws-monitor` イベントペイロード */
+export type WsMonitorEvent =
+	| ({ type: "frame" } & MonitorFrame)
+	| { type: "lagged"; skipped: number };
+
 /** Tauri側 WebSocketサーバから流れてくるイベント */
 export type WsServerEvent =
 	| { type: "started"; port: number; hosts: string[] }

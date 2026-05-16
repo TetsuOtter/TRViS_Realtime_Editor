@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useEditorStore } from "../store/editorStore";
-import { broadcastAllWorkGroups } from "../api/wsServer";
+import { useMonitorStore } from "../store/monitorStore";
+import { broadcastAllWorkGroups, openMonitorWindow } from "../api/wsServer";
 import { JsonEditDialog, type JsonEditDialogMode } from "../jsonEditor/JsonEditDialog";
 import { tryParseDocument, type ParseError } from "../jsonEditor/parseDocument";
 import { ThirdPartyLicensesDialog } from "./ThirdPartyLicensesDialog";
@@ -15,6 +16,9 @@ interface JsonDialogState {
 export function Toolbar() {
 	const { workGroups, history, undo, redo, addWorkGroup, liveBroadcast, setLiveBroadcast } =
 		useEditorStore();
+	const monitorOpen = useMonitorStore((s) => s.open);
+	const monitorDock = useMonitorStore((s) => s.settings.dock);
+	const setMonitorOpen = useMonitorStore((s) => s.setOpen);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [jsonDialog, setJsonDialog] = useState<JsonDialogState | null>(null);
 	const [licensesOpen, setLicensesOpen] = useState(false);
@@ -96,6 +100,15 @@ export function Toolbar() {
 			console.error("broadcastAllWorkGroups failed:", e);
 		}
 	};
+
+	const handleToggleMonitor = () => {
+		if (monitorDock === "window") {
+			void openMonitorWindow();
+			return;
+		}
+		setMonitorOpen(!monitorOpen);
+	};
+	const monitorActive = monitorDock === "window" ? false : monitorOpen;
 
 	const btnStyle: React.CSSProperties = {
 		padding: "4px 12px",
@@ -199,8 +212,21 @@ export function Toolbar() {
 			</label>
 
 			<button
+				onClick={handleToggleMonitor}
+				style={{
+					...btnStyle,
+					marginLeft: "auto",
+					background: monitorActive ? "var(--accent)" : "var(--bg-panel)",
+					color: monitorActive ? "#fff" : "var(--text)",
+				}}
+				title="送受信 JSON を時刻付きで表示し、任意の内容を手動送信できるデバッグ用モニタ"
+			>
+				通信モニタ
+			</button>
+
+			<button
 				onClick={() => setAppInfoOpen(true)}
-				style={{ ...btnStyle, marginLeft: "auto" }}
+				style={btnStyle}
 				title="バージョン・コミットハッシュなどのビルド情報を表示"
 			>
 				アプリ情報

@@ -332,6 +332,9 @@ pub enum OutboundMessage {
 	HeaderColor(HeaderColorMessage),
 	Notification(NotificationMessage),
 	TimeFormat(TimeFormatMessage),
+	/// デバッグ用: 任意のテキストを一切加工せずそのまま送る。
+	/// 通信モニタの手動送信機能で使用する。JSON 妥当性検証はしない。
+	Raw(String),
 }
 
 impl OutboundMessage {
@@ -346,6 +349,31 @@ impl OutboundMessage {
 			OutboundMessage::HeaderColor(m) => serde_json::to_string(m),
 			OutboundMessage::Notification(m) => serde_json::to_string(m),
 			OutboundMessage::TimeFormat(m) => serde_json::to_string(m),
+			OutboundMessage::Raw(s) => Ok(s.clone()),
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn raw_message_is_passed_through_verbatim() {
+		// 手動送信は一切加工せず素通しすること (整形・再シリアライズしない)。
+		let payload = r#"{"MessageType":"Custom","x":[1,2,3],"nested":{"a":"b"}}"#;
+		let out = OutboundMessage::Raw(payload.to_string())
+			.to_json_string()
+			.unwrap();
+		assert_eq!(out, payload);
+	}
+
+	#[test]
+	fn raw_message_does_not_require_valid_json() {
+		// 「任意の内容を送信」要件: JSON でなくてもそのまま通す。
+		let out = OutboundMessage::Raw("not json".to_string())
+			.to_json_string()
+			.unwrap();
+		assert_eq!(out, "not json");
 	}
 }

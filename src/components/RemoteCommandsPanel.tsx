@@ -1,11 +1,14 @@
 import { useState } from "react";
 
 import {
+	broadcastDiagramInfo,
 	broadcastHeaderColor,
 	broadcastNotification,
 	broadcastOperationCommand,
+	broadcastServerInfo,
 	broadcastTimeFormat,
 } from "../api/wsServer";
+import { useEditorStore } from "../store/editorStore";
 import type { OperationCommandAction } from "../types/trvis";
 
 const OPERATION_BUTTONS: { action: OperationCommandAction; label: string; danger?: boolean }[] = [
@@ -37,6 +40,16 @@ const buttonStyle: React.CSSProperties = {
 	cursor: "pointer",
 };
 
+const textInputStyle: React.CSSProperties = {
+	padding: "3px 6px",
+	border: "1px solid var(--border)",
+	borderRadius: 4,
+	background: "var(--bg)",
+	fontSize: 12,
+	width: "100%",
+	boxSizing: "border-box",
+};
+
 function rgbStringToInt(hex: string): number | null {
 	const m = hex.replace(/^#/, "");
 	if (!/^[0-9a-fA-F]{6}$/.test(m)) return null;
@@ -54,6 +67,23 @@ export function RemoteCommandsPanel() {
 	const [notifBody, setNotifBody] = useState("");
 	const [notifPriority, setNotifPriority] = useState(0);
 	const [busy, setBusy] = useState(false);
+
+	const serverInfo = useEditorStore((s) => s.serverInfo);
+	const setServerInfo = useEditorStore((s) => s.setServerInfo);
+	const diagramInfo = useEditorStore((s) => s.diagramInfo);
+	const setDiagramInfo = useEditorStore((s) => s.setDiagramInfo);
+	const workGroups = useEditorStore((s) => s.workGroups);
+	const [wgIdsText, setWgIdsText] = useState(() => diagramInfo.WorkGroupIds.join(", "));
+
+	const commitWgIds = (text: string) => {
+		setWgIdsText(text);
+		setDiagramInfo({
+			WorkGroupIds: text
+				.split(/[,\s]+/)
+				.map((s) => s.trim())
+				.filter((s) => s !== ""),
+		});
+	};
 
 	const guard = async (fn: () => Promise<void>, label: string) => {
 		if (busy) return;
@@ -243,6 +273,129 @@ export function RemoteCommandsPanel() {
 								}}
 							>
 								送信
+							</button>
+						</div>
+					</div>
+
+					{/* サーバー情報 */}
+					<div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 240 }}>
+						<span style={labelStyle}>サーバー情報 (ServerInfo)</span>
+						<input
+							type="text"
+							placeholder="Name"
+							value={serverInfo.Name}
+							onChange={(e) => setServerInfo({ Name: e.target.value })}
+							style={textInputStyle}
+						/>
+						<input
+							type="text"
+							placeholder="Admin (連絡先)"
+							value={serverInfo.Admin}
+							onChange={(e) => setServerInfo({ Admin: e.target.value })}
+							style={textInputStyle}
+						/>
+						<div style={{ display: "flex", gap: 4 }}>
+							<input
+								type="text"
+								placeholder="Version (空=アプリ版)"
+								value={serverInfo.Version}
+								onChange={(e) => setServerInfo({ Version: e.target.value })}
+								style={textInputStyle}
+							/>
+							<input
+								type="text"
+								placeholder="ProtocolVersion"
+								value={serverInfo.ProtocolVersion}
+								onChange={(e) => setServerInfo({ ProtocolVersion: e.target.value })}
+								style={textInputStyle}
+							/>
+						</div>
+						<button
+							onClick={() =>
+								guard(
+									() =>
+										broadcastServerInfo({
+											name: serverInfo.Name.trim() || null,
+											admin: serverInfo.Admin.trim() || null,
+											version: serverInfo.Version.trim() || null,
+											protocolVersion: serverInfo.ProtocolVersion.trim() || null,
+										}),
+									"ServerInfo.broadcast",
+								)
+							}
+							style={buttonStyle}
+						>
+							ブロードキャスト
+						</button>
+					</div>
+
+					{/* ダイヤ情報 */}
+					<div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 240 }}>
+						<span style={labelStyle}>ダイヤ情報 (DiagramInfo)</span>
+						<input
+							type="text"
+							placeholder="DiagramId"
+							value={diagramInfo.DiagramId}
+							onChange={(e) => setDiagramInfo({ DiagramId: e.target.value })}
+							style={textInputStyle}
+						/>
+						<input
+							type="text"
+							placeholder="Name (ダイヤ名)"
+							value={diagramInfo.Name}
+							onChange={(e) => setDiagramInfo({ Name: e.target.value })}
+							style={textInputStyle}
+						/>
+						<textarea
+							placeholder="Description (説明)"
+							value={diagramInfo.Description}
+							onChange={(e) => setDiagramInfo({ Description: e.target.value })}
+							style={{ ...textInputStyle, minHeight: 40, resize: "vertical" }}
+						/>
+						<input
+							type="text"
+							placeholder="WorkGroupIds (カンマ区切り)"
+							value={wgIdsText}
+							onChange={(e) => commitWgIds(e.target.value)}
+							style={textInputStyle}
+						/>
+						<div style={{ display: "flex", gap: 4 }}>
+							<button
+								onClick={() =>
+									commitWgIds(
+										workGroups
+											.map((g) => g.Id)
+											.filter((id): id is string => !!id)
+											.join(", "),
+									)
+								}
+								disabled={workGroups.length === 0}
+								style={{
+									...buttonStyle,
+									color: workGroups.length === 0 ? "var(--text-muted)" : "var(--text)",
+									cursor: workGroups.length === 0 ? "not-allowed" : "pointer",
+								}}
+							>
+								現在のWorkGroupで埋める
+							</button>
+							<button
+								onClick={() =>
+									guard(() => {
+										const ids = wgIdsText
+											.split(/[,\s]+/)
+											.map((s) => s.trim())
+											.filter((s) => s !== "");
+										return broadcastDiagramInfo({
+											diagramId: diagramInfo.DiagramId.trim() || null,
+											name: diagramInfo.Name.trim() || null,
+											description: diagramInfo.Description.trim() || null,
+											workGroupIds: ids.length > 0 ? ids : null,
+										});
+									}, "DiagramInfo.broadcast")
+								}
+								style={buttonStyle}
+							>
+								ブロードキャスト
 							</button>
 						</div>
 					</div>

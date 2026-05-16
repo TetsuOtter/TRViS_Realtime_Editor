@@ -1,4 +1,5 @@
 import type { TimetableRowData } from "../../types/trvis";
+import { STATION_RECORD_TYPE_OPTIONS } from "../../types/trvisEnums";
 import { useEditorStore } from "../../store/editorStore";
 
 interface Props {
@@ -82,15 +83,27 @@ export function TimetableRowForm({ workGroupId, workId, trainId, row }: Props) {
 			</Field>
 
 			<Field label="レコード種別">
-				<input
-					type="number"
-					value={row.RecordType ?? ""}
-					onChange={(e) =>
-						upd({ RecordType: e.target.value === "" ? null : Number(e.target.value) })
-					}
-					style={inputStyle}
-					placeholder="未設定"
-				/>
+				{(() => {
+					const v = row.RecordType;
+					const hasUnknown = v != null && !STATION_RECORD_TYPE_OPTIONS.some((o) => o.value === v);
+					return (
+						<select
+							value={v ?? ""}
+							onChange={(e) =>
+								upd({ RecordType: e.target.value === "" ? null : Number(e.target.value) })
+							}
+							style={inputStyle}
+						>
+							<option value="">未設定</option>
+							{STATION_RECORD_TYPE_OPTIONS.map((o) => (
+								<option key={o.value} value={o.value}>
+									{o.label}
+								</option>
+							))}
+							{hasUnknown && <option value={v!}>{v}: (不明な値)</option>}
+						</select>
+					);
+				})()}
 			</Field>
 
 			<Field label="番線名">

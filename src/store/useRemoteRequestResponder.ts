@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 
-import { respondServerInfo, subscribeWsEvents } from "../api/wsServer";
-
-const PROTOCOL_VERSION = "1";
+import { respondDiagramInfo, respondServerInfo, subscribeWsEvents } from "../api/wsServer";
+import { useEditorStore } from "./editorStore";
+import { buildServerInfoResponse, decideDiagramInfoResponse } from "./remoteInfoResponse";
 
 declare const __APP_VERSION__: string | undefined;
 
@@ -11,28 +11,38 @@ declare const __APP_VERSION__: string | undefined;
  *   - `{"MessageType":"RequestServerInfo"}`
  *   - `{"MessageType":"RequestDiagramInfo","DiagramId"?:string}`
  * を送ってくることがある。本フックはそれら要求イベントを購読し、
- * `RequestServerInfo` に対しては要求元クライアントへ `ServerInfo` を返信する。
- * (ReferenceServer も同様に要求元クライアントだけに送る単一クライアント返信。)
+ * ストアに設定されたサーバー情報 / ダイヤ情報を要求元クライアントへ返信する。
+ * (ReferenceServer と同様、要求元クライアントだけに送る単一クライアント返信。)
  *
- * `RequestDiagramInfo` についてはエディタにダイヤ概念が存在しないため、
- * 現状は応答しない (ReferenceServer も対象なしの場合は無応答)。
+ * 応答内容の判定は `remoteInfoResponse` の純粋ロジックに委譲する。
+ * ダイヤ情報が未設定、または要求 `DiagramId` が設定値と不一致のときは
+ * 無応答 (TRViS は応答が来ないことを許容する)。
  */
 export function useRemoteRequestResponder() {
 	useEffect(() => {
 		let unsub: (() => void) | undefined;
 		(async () => {
 			unsub = await subscribeWsEvents((ev) => {
-				if (ev.type !== "request-server-info") return;
-				const version =
-					typeof __APP_VERSION__ === "string" && __APP_VERSION__ ? __APP_VERSION__ : "0.0.0";
-				respondServerInfo({
-					clientId: ev.clientId,
-					name: "TRViS Realtime Editor",
-					version,
-					protocolVersion: PROTOCOL_VERSION,
-				}).catch((e) => {
-					console.error("auto ServerInfo response failed:", e);
-				});
+				if (ev.type === "request-server-info") {
+					const appVersion =
+						typeof __APP_VERSION__ === "string" && __APP_VERSION__ ? __APP_VERSION__ : "0.0.0";
+					const resp = buildServerInfoResponse(useEditorStore.getState().serverInfo, appVersion);
+					respondServerInfo({ clientId: ev.clientId, ...resp }).catch((e) => {
+						console.error("auto ServerInfo response failed:", e);
+					});
+					return;
+				}
+
+				if (ev.type === "request-diagram-info") {
+					const resp = decideDiagramInfoResponse(
+						useEditorStore.getState().diagramInfo,
+						ev.diagramId,
+					);
+					if (!resp) return;
+					respondDiagramInfo({ clientId: ev.clientId, ...resp }).catch((e) => {
+						console.error("auto DiagramInfo response failed:", e);
+					});
+				}
 			});
 		})();
 		return () => unsub?.();

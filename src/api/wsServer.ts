@@ -262,6 +262,28 @@ export async function broadcastDiagramInfo(args: {
 	});
 }
 
+/**
+ * 特定のクライアントだけに `DiagramInfo` を返信する (`RequestDiagramInfo` への応答)。
+ * 戻り値は送信先クライアントがまだ接続されていれば true。
+ */
+export async function respondDiagramInfo(args: {
+	clientId: string;
+	diagramId?: string | null;
+	name?: string | null;
+	description?: string | null;
+	workGroupIds?: string[] | null;
+}): Promise<boolean> {
+	const t = await loadTauri();
+	if (!t) return false;
+	return t.invoke<boolean>("respond_diagram_info", {
+		clientId: args.clientId,
+		diagramId: args.diagramId ?? null,
+		name: args.name ?? null,
+		description: args.description ?? null,
+		workGroupIds: args.workGroupIds ?? null,
+	});
+}
+
 export async function setSyncedData(args: {
 	locationM: number | null;
 	timeMs: number;

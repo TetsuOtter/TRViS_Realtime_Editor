@@ -275,6 +275,28 @@ async fn broadcast_diagram_info(
 	Ok(())
 }
 
+/// 特定のクライアントだけに `DiagramInfo` を返信する (`RequestDiagramInfo` の応答用)。
+/// 戻り値は送信に成功したかどうか (false = 送信先クライアントが既に切断されている)。
+#[tauri::command]
+async fn respond_diagram_info(
+	state: State<'_, AppState>,
+	client_id: String,
+	diagram_id: Option<String>,
+	name: Option<String>,
+	description: Option<String>,
+	work_group_ids: Option<Vec<String>>,
+) -> Result<bool, String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = DiagramInfoMessage::new(diagram_id, name, description, work_group_ids);
+	Ok(
+		handle
+			.state
+			.send_to(&client_id, OutboundMessage::DiagramInfo(msg))
+			.await,
+	)
+}
+
 /// SyncedData の最新値を更新し、即時送信する。
 ///
 /// `auto_time_ms = true` のときはサーバ側で再送毎に wall-clock 由来の `Time_ms` を
@@ -414,6 +436,7 @@ pub fn run() {
 			broadcast_server_info,
 			respond_server_info,
 			broadcast_diagram_info,
+			respond_diagram_info,
 			set_synced_data,
 			list_local_hosts,
 			write_text_file,

@@ -225,6 +225,34 @@ export interface EditorSelection {
 	trainId?: string;
 }
 
+/**
+ * エディタが `RequestServerInfo` への応答 / proactive broadcast で返す
+ * サーバー情報。各フィールドは空文字なら未設定 (null) として送出する。
+ */
+export interface EditorServerInfo {
+	Name: string;
+	Admin: string;
+	Version: string;
+	/** TRViS NetworkSyncService 現行プロトコルは "1.0"。 */
+	ProtocolVersion: string;
+}
+
+/**
+ * エディタが `RequestDiagramInfo` への応答 / proactive broadcast で返す
+ * ダイヤ情報。エディタは 1 ドキュメント = 1 ダイヤとして扱う。
+ *
+ * `RequestDiagramInfo` に `DiagramId` 指定がある場合、その値が `DiagramId`
+ * と一致するときのみ応答する (不一致・未設定時は無応答 = リファレンス
+ * サーバ準拠。TRViS は応答が来ないことを許容する)。
+ */
+export interface EditorDiagramInfo {
+	DiagramId: string;
+	Name: string;
+	Description: string;
+	/** このダイヤに含まれる WorkGroup ID 一覧 (空なら送出時に null)。 */
+	WorkGroupIds: string[];
+}
+
 /** Tauri側 WebSocketサーバから流れてくるイベント */
 export type WsServerEvent =
 	| { type: "started"; port: number; hosts: string[] }

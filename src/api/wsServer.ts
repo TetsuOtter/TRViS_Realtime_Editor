@@ -10,6 +10,7 @@ import type {
 	WorkGroupData,
 	WorkData,
 	TrainData,
+	WsMonitorEvent,
 	WsServerEvent,
 } from "../types/trvis";
 
@@ -313,6 +314,67 @@ export async function subscribeWsEvents(
 	const t = await loadTauri();
 	if (!t) return () => {};
 	return t.listen<WsServerEvent>("ws-event", (e) => handler(e.payload));
+}
+
+/** Tauri の `ws-monitor` (通信モニタフレーム) を購読。 unsubscribe を返す。 */
+export async function subscribeWsMonitor(
+	handler: (event: WsMonitorEvent) => void,
+): Promise<() => void> {
+	const t = await loadTauri();
+	if (!t) return () => {};
+	return t.listen<WsMonitorEvent>("ws-monitor", (e) => handler(e.payload));
+}
+
+/**
+ * 通信モニタの有効/無効を切り替える。
+ * 無効時は Rust 側でワイヤ JSON の観測フレームを一切発火しない
+ * (モニタを閉じている間の余計な IPC を防ぐ)。
+ */
+export async function setMonitorEnabled(enabled: boolean): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("set_monitor_enabled", { enabled });
+}
+
+/**
+ * デバッグ用: 任意のテキストを一切加工せず送信する。
+ * `clientId` 省略時は全クライアントへブロードキャスト。
+ * 戻り値 false = 指定クライアントが既に切断済み。
+ * JSON 妥当性検証はしない (呼び出し側で必要なら警告する)。
+ */
+export async function sendRawMessage(text: string, clientId?: string): Promise<boolean> {
+	const t = await loadTauri();
+	if (!t) return false;
+	return t.invoke<boolean>("send_raw_message", {
+		clientId: clientId ?? null,
+		text,
+	});
+}
+
+/** 通信モニタを別ウィンドウで開く (既に開いていればフォーカス)。 */
+export async function openMonitorWindow(): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("open_monitor_window");
+}
+
+/**
+ * 別ウィンドウのモニタをアプリ内ドックへ戻す。
+ * メインウィンドウへ位置を通知し、モニタウィンドウを閉じる。
+ */
+export async function redockMonitor(position: "right" | "bottom" | "left"): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("redock_monitor", { position });
+}
+
+/** メインウィンドウ側: 別ウィンドウからの「アプリ内へ戻す」要求を購読。 */
+export async function subscribeMonitorRedock(
+	handler: (position: "right" | "bottom" | "left") => void,
+): Promise<() => void> {
+	const t = await loadTauri();
+	if (!t) return () => {};
+	return t.listen<"right" | "bottom" | "left">("monitor-redock", (e) => handler(e.payload));
 }
 
 /** TRViSのカスタムスキームURL生成 (TRViS.LocalServers ConnectHelperと同じ書式)。 */

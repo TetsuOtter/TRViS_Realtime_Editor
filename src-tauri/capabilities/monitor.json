@@ -1,0 +1,7 @@
+{
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "monitor",
+	"description": "Capabilities for the standalone communication monitor window",
+	"windows": ["monitor"],
+	"permissions": ["core:default"]
+}

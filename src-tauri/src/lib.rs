@@ -1,19 +1,24 @@
 //! Tauri アプリ本体。WebSocket サーバの起動・停止・送信を IPC コマンドで提供する。
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use serde_json::Value;
 use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use trvis_ws_server::{
-	start, CachedSyncedData, DiagramInfoMessage, HeaderColorMessage, NotificationMessage,
-	OperationCommandMessage, OutboundMessage, SelectTrainMessage, ServerEvent, ServerHandle,
-	ServerInfoMessage, ServerOptions, ServerTimetableMessage, TimeFormatMessage,
+	start, CachedSyncedData, DiagramInfoMessage, HeaderColorMessage, MonitorDirection, MonitorFrame,
+	NotificationMessage, OperationCommandMessage, OutboundMessage, SelectTrainMessage, ServerEvent,
+	ServerHandle, ServerInfoMessage, ServerOptions, ServerTimetableMessage, TimeFormatMessage,
 };
 
 #[derive(Default)]
 struct AppState {
 	server: Arc<Mutex<Option<ServerHandle>>>,
+	/// 通信モニタを有効にしたいかどうかの「意図」。サーバの起動/停止を跨いで保持する。
+	/// サーバ起動時にこの値を新しい `SharedState` へ適用することで、
+	/// 「モニタを開いてからサーバを起動する」操作順でも確実に有効化される。
+	monitor_enabled: Arc<AtomicBool>,
 }
 
 #[tauri::command]
@@ -37,6 +42,12 @@ async fn start_server(
 	.await
 	.map_err(|e| e.to_string())?;
 
+	// モニタを先に開いていた場合でも有効化されるよう、保持していた意図を新しい
+	// SharedState へ適用する (set_monitor_enabled は起動中サーバにしか効かないため)。
+	handle
+		.state
+		.set_monitor_enabled(state.monitor_enabled.load(Ordering::Relaxed));
+
 	let mut events = handle.state.subscribe();
 	let app_for_events = app.clone();
 	tokio::spawn(async move {
@@ -44,6 +55,27 @@ async fn start_server(
 			let _ = app_for_events.emit("ws-event", server_event_to_json(&ev));
 			if matches!(ev, ServerEvent::Stopped) {
 				break;
+			}
+		}
+	});
+
+	// 通信モニタフレームを `ws-monitor` イベントとして UI / モニタウィンドウへ転送する。
+	// `lagged` (バッファ溢れ) は debug 用途では致命的でないので件数だけ通知して継続する。
+	let mut monitor_rx = handle.state.subscribe_monitor();
+	let app_for_monitor = app.clone();
+	tokio::spawn(async move {
+		loop {
+			match monitor_rx.recv().await {
+				Ok(frame) => {
+					let _ = app_for_monitor.emit("ws-monitor", monitor_frame_to_json(&frame));
+				}
+				Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+					let _ = app_for_monitor.emit(
+						"ws-monitor",
+						serde_json::json!({ "type": "lagged", "skipped": skipped }),
+					);
+				}
+				Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
 			}
 		}
 	});
@@ -328,6 +360,76 @@ async fn set_synced_data(
 	Ok(())
 }
 
+/// 通信モニタの有効/無効を切り替える。
+/// 無効時はワイヤを流れる JSON の観測フレームを一切発火しない。
+/// サーバ未起動時は no-op (起動後にモニタを開いても再設定されるため問題ない)。
+#[tauri::command]
+async fn set_monitor_enabled(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
+	// 意図を保持しておき、サーバ起動時にも適用できるようにする。
+	state.monitor_enabled.store(enabled, Ordering::Relaxed);
+	let guard = state.server.lock().await;
+	if let Some(handle) = guard.as_ref() {
+		handle.state.set_monitor_enabled(enabled);
+	}
+	Ok(())
+}
+
+/// デバッグ用: 任意のテキストを一切加工せずクライアントへ送る。
+/// `client_id` が `None` の場合は全クライアントへブロードキャスト、
+/// 指定された場合はそのクライアントだけに送る (戻り値 false = 送信先が既に切断)。
+/// JSON 妥当性検証はしない (「任意の内容を送信」要件のため)。
+#[tauri::command]
+async fn send_raw_message(
+	state: State<'_, AppState>,
+	client_id: Option<String>,
+	text: String,
+) -> Result<bool, String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	match client_id {
+		Some(id) => Ok(handle.state.send_to(&id, OutboundMessage::Raw(text)).await),
+		None => {
+			handle.state.broadcast(OutboundMessage::Raw(text)).await;
+			Ok(true)
+		}
+	}
+}
+
+/// 通信モニタを別ウィンドウで開く。既に開いていればフォーカスする。
+/// 同一フロントエンドを `#monitor` ハッシュ付きで読み込み、JS 側でモニタ単独表示に分岐する。
+#[tauri::command]
+async fn open_monitor_window(app: tauri::AppHandle) -> Result<(), String> {
+	if let Some(w) = app.get_webview_window("monitor") {
+		let _ = w.set_focus();
+		return Ok(());
+	}
+	tauri::WebviewWindowBuilder::new(
+		&app,
+		"monitor",
+		tauri::WebviewUrl::App("index.html#monitor".into()),
+	)
+	.title("通信モニタ - TRViS Realtime Editor")
+	.inner_size(900.0, 700.0)
+	.min_inner_size(480.0, 360.0)
+	.build()
+	.map_err(|e| e.to_string())?;
+	Ok(())
+}
+
+/// 別ウィンドウのモニタをアプリ内ドックへ戻す。
+/// メインウィンドウへ `monitor-redock` を通知してから、モニタウィンドウを閉じる。
+/// (ウィンドウ間でストアは共有されないため、イベント経由で位置を伝える。)
+#[tauri::command]
+async fn redock_monitor(app: tauri::AppHandle, position: String) -> Result<(), String> {
+	app
+		.emit("monitor-redock", position)
+		.map_err(|e| e.to_string())?;
+	if let Some(w) = app.get_webview_window("monitor") {
+		let _ = w.close();
+	}
+	Ok(())
+}
+
 #[tauri::command]
 fn list_local_hosts() -> Vec<String> {
 	list_local_ipv4()
@@ -417,6 +519,20 @@ fn server_event_to_json(ev: &ServerEvent) -> Value {
 	}
 }
 
+fn monitor_frame_to_json(frame: &MonitorFrame) -> Value {
+	let direction = match frame.direction {
+		MonitorDirection::In => "in",
+		MonitorDirection::Out => "out",
+	};
+	serde_json::json!({
+		"type": "frame",
+		"direction": direction,
+		"clientId": frame.client_id,
+		"json": frame.json,
+		"ts": frame.ts_ms,
+	})
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
 	tauri::Builder::default()
@@ -438,6 +554,10 @@ pub fn run() {
 			broadcast_diagram_info,
 			respond_diagram_info,
 			set_synced_data,
+			set_monitor_enabled,
+			send_raw_message,
+			open_monitor_window,
+			redock_monitor,
 			list_local_hosts,
 			write_text_file,
 			get_app_info

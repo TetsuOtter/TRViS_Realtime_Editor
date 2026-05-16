@@ -14,4 +14,7 @@ pub mod state;
 
 pub use messages::*;
 pub use server::{start, ServerHandle, ServerOptions};
-pub use state::{ServerEvent, ServerEventReceiver, ServerEventSender, SharedState};
+pub use state::{
+	MonitorDirection, MonitorFrame, MonitorFrameReceiver, MonitorFrameSender, ServerEvent,
+	ServerEventReceiver, ServerEventSender, SharedState,
+};

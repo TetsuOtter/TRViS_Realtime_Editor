@@ -4,7 +4,9 @@ import { current } from "immer";
 import { v4 as uuidv4 } from "uuid";
 
 import type {
+	EditorDiagramInfo,
 	EditorSelection,
+	EditorServerInfo,
 	RemoteSelection,
 	SyncedData,
 	TimetableRowData,
@@ -39,6 +41,15 @@ export interface EditorState {
 	 */
 	liveBroadcast: boolean;
 
+	/**
+	 * `RequestServerInfo` への自動応答 / proactive broadcast に使うサーバー情報。
+	 */
+	serverInfo: EditorServerInfo;
+	/**
+	 * `RequestDiagramInfo` への自動応答 / proactive broadcast に使うダイヤ情報。
+	 */
+	diagramInfo: EditorDiagramInfo;
+
 	/* History */
 	history: { past: WorkGroupData[][]; future: WorkGroupData[][] };
 
@@ -68,6 +79,9 @@ export interface EditorState {
 	setSyncedData: (patch: Partial<SyncedData>) => void;
 	setAutoTimeMs: (enabled: boolean) => void;
 	setLiveBroadcast: (enabled: boolean) => void;
+
+	setServerInfo: (patch: Partial<EditorServerInfo>) => void;
+	setDiagramInfo: (patch: Partial<EditorDiagramInfo>) => void;
 
 	addWorkGroup: (init?: Partial<WorkGroupData>) => string;
 	updateWorkGroup: (id: string, patch: Partial<WorkGroupData>) => void;
@@ -237,6 +251,13 @@ export const useEditorStore = create<EditorState>()(
 			syncedData: { Location_m: null, Time_ms: null, CanStart: true },
 			autoTimeMs: true,
 			liveBroadcast: true,
+			serverInfo: {
+				Name: "TRViS Realtime Editor",
+				Admin: "",
+				Version: "",
+				ProtocolVersion: "1.0",
+			},
+			diagramInfo: { DiagramId: "", Name: "", Description: "", WorkGroupIds: [] },
 			history: { past: [], future: [] },
 			documentVersion: 0,
 
@@ -323,6 +344,9 @@ export const useEditorStore = create<EditorState>()(
 			setSyncedData: (patch) => set((s) => ({ syncedData: { ...s.syncedData, ...patch } })),
 			setAutoTimeMs: (autoTimeMs) => set({ autoTimeMs }),
 			setLiveBroadcast: (liveBroadcast) => set({ liveBroadcast }),
+
+			setServerInfo: (patch) => set((s) => ({ serverInfo: { ...s.serverInfo, ...patch } })),
+			setDiagramInfo: (patch) => set((s) => ({ diagramInfo: { ...s.diagramInfo, ...patch } })),
 
 			addWorkGroup: (init) => {
 				const wg = newWorkGroup(init);

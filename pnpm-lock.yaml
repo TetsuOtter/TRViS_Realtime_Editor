@@ -47,8 +47,8 @@ importers:
         specifier: 11.1.8
         version: 11.1.8
       json-schema-library:
-        specifier: ^11.4.0
-        version: 11.4.0
+        specifier: ^11.4.1
+        version: 11.4.1
       jsonc-parser:
         specifier: ^3.3.1
         version: 3.3.1
@@ -1303,8 +1303,8 @@ packages:
   json-buffer@3.0.1:
     resolution: {integrity: sha512-4bV5BfR2mqfQTJm+V5tPPdf+ZpuhiIvTuAB5g8kcrXOZpTT/QwwVRWBywX1ozr6lEuPdbHxwaJlm9G6mI2sfSQ==}
 
-  json-schema-library@11.4.0:
-    resolution: {integrity: sha512-BKmJ2xmIQ8xIRDoGg/lTdWFrxKHaphn6qwV4u0glxEHG7Mg3M/GZhLNmgN2IlnQCs6Umg1kg4IcdBVBL+fOKZA==}
+  json-schema-library@11.4.1:
+    resolution: {integrity: sha512-5jG4IFDAsSx8e+c72bGHTH4oQf8ktpdt4Q/m3GVln+l6yIy4PpYZpoA/GAdL+/i/JzagMwm47qGobF6jAxqyEg==}
 
   json-schema-library@9.3.5:
     resolution: {integrity: sha512-5eBDx7cbfs+RjylsVO+N36b0GOPtv78rfqgf2uON+uaHUIC62h63Y8pkV2ovKbaL4ZpQcHp21968x5nx/dFwqQ==}
@@ -3177,7 +3177,7 @@ snapshots:
 
   json-buffer@3.0.1: {}
 
-  json-schema-library@11.4.0:
+  json-schema-library@11.4.1:
     dependencies:
       '@hyperjump/json-schema-formats': 1.0.1
       '@sagold/json-pointer': 7.2.1

@@ -52,7 +52,7 @@
 		"react-dom": "19.2.6",
 		"react-error-boundary": "^6.1.1",
 		"uuid": "^14.0.0",
-		"zustand": "5.0.13"
+		"zustand": "5.0.14"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -83,7 +83,7 @@
 		"overrides": {
 			"@codemirror/view": "6.43.0",
 			"@codemirror/lint": "6.9.6",
-			"zustand": "5.0.13",
+			"zustand": "5.0.14",
 			"@tauri-apps/cli": "2.11.1",
 			"immer": "11.1.8",
 			"vite": "8.0.13"

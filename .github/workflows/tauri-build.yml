@@ -42,7 +42,7 @@ jobs:
           - { os: windows-arm64, runner: windows-11-arm, target: aarch64-pc-windows-msvc }
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
         with:

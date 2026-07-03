@@ -37,7 +37,7 @@
 		"@codemirror/lint": "6.9.6",
 		"@codemirror/state": "^6.6.0",
 		"@codemirror/view": "6.43.0",
-		"@tauri-apps/api": "^2.11.0",
+		"@tauri-apps/api": "^2.11.1",
 		"@tauri-apps/plugin-dialog": "^2.7.1",
 		"@tauri-apps/plugin-shell": "^2.3.5",
 		"@types/json-schema": "^7.0.15",
@@ -58,7 +58,7 @@
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.60.0",
 		"@resvg/resvg-js": "^2.6.2",
-		"@tauri-apps/cli": "2.11.1",
+		"@tauri-apps/cli": "2.11.4",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/react": "^16.3.2",
 		"@testing-library/user-event": "^14.6.1",
@@ -84,7 +84,7 @@
 			"@codemirror/view": "6.43.0",
 			"@codemirror/lint": "6.9.6",
 			"zustand": "5.0.13",
-			"@tauri-apps/cli": "2.11.1",
+			"@tauri-apps/cli": "2.11.4",
 			"immer": "11.1.8",
 			"vite": "8.0.13"
 		}

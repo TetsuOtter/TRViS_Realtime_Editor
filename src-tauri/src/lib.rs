@@ -220,10 +220,18 @@ async fn broadcast_notification(
 	body: Option<String>,
 	priority: Option<i32>,
 	issued_at: Option<String>,
+	acknowledged: Option<bool>,
 ) -> Result<(), String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
-	let msg = NotificationMessage::new(id, title, body, priority.unwrap_or(0), issued_at);
+	let msg = NotificationMessage::new(
+		id,
+		title,
+		body,
+		priority.unwrap_or(0),
+		issued_at,
+		acknowledged.unwrap_or(false),
+	);
 	handle
 		.state
 		.broadcast(OutboundMessage::Notification(msg))

@@ -181,7 +181,11 @@ export async function broadcastHeaderColor(args: {
 	});
 }
 
-/** 通告 (任意のお知らせ) を送る。 */
+/**
+ * 通告 (任意のお知らせ) を送る。
+ * `id` を指定すると TRViS 側で「受領可能」な通告になり、受領時に
+ * `AcknowledgeNotification` が送り返される。省略時は情報通知 (閉じるだけ)。
+ */
 export async function broadcastNotification(args: {
 	id?: string | null;
 	title?: string | null;
@@ -189,6 +193,8 @@ export async function broadcastNotification(args: {
 	priority?: number | null;
 	/** ISO8601 文字列 */
 	issuedAt?: string | null;
+	/** サーバ再配信時に既読扱いにするケース用。通常送信は false (省略)。 */
+	acknowledged?: boolean | null;
 }): Promise<void> {
 	const t = await loadTauri();
 	if (!t) return;
@@ -198,6 +204,7 @@ export async function broadcastNotification(args: {
 		body: args.body ?? null,
 		priority: args.priority ?? null,
 		issuedAt: args.issuedAt ?? null,
+		acknowledged: args.acknowledged ?? false,
 	});
 }
 

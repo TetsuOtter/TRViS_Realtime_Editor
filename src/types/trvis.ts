@@ -174,7 +174,12 @@ export interface ServerHeaderColorMessage {
 	Color_RGB?: number | null;
 }
 
-/** サーバ → クライアント: 通告データ */
+/**
+ * サーバ → クライアント: 通告データ (TRViS.JsonModels `NotificationData` 準拠)。
+ * `Id` を伴う通告は TRViS 側で「受領可能」(受領ボタン付き) として扱われ、
+ * クライアントが受領すると `AcknowledgeNotification` を送り返す。`Id` 無しは
+ * 情報通知 (閉じるだけ)。
+ */
 export interface ServerNotificationMessage {
 	MessageType: "Notification";
 	Id?: string | null;
@@ -184,6 +189,12 @@ export interface ServerNotificationMessage {
 	Priority: number;
 	/** ISO8601 文字列 */
 	IssuedAt?: string | null;
+	/**
+	 * サーバがこのクライアントについて当該通告を「受領済み」と判断しているか。
+	 * true のときクライアントは既読扱いとし再ポップアップしない (再配信時想定)。
+	 * エディタからの通常送信は新規通告なので false。
+	 */
+	Acknowledged: boolean;
 }
 
 /** サーバ → クライアント: タイトルバー時刻表示フォーマット指定 */

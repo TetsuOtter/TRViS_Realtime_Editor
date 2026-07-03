@@ -286,6 +286,12 @@ pub struct NotificationMessage {
 	pub priority: i32,
 	#[serde(rename = "IssuedAt", skip_serializing_if = "Option::is_none")]
 	pub issued_at: Option<String>,
+	/// クライアントが当該通告を「受領済み」と判断してよいか (TRViS.JsonModels
+	/// `NotificationData.Acknowledged` 準拠)。`Priority` と同様に常に serialize する
+	/// (リファレンスサーバも常に出力し、TRViS 側は欠落を false 扱いする)。
+	/// エディタからの通常送信は新規通告なので `false`。
+	#[serde(rename = "Acknowledged")]
+	pub acknowledged: bool,
 }
 
 impl NotificationMessage {
@@ -295,6 +301,7 @@ impl NotificationMessage {
 		body: Option<String>,
 		priority: i32,
 		issued_at: Option<String>,
+		acknowledged: bool,
 	) -> Self {
 		Self {
 			message_type: "Notification".into(),
@@ -303,6 +310,7 @@ impl NotificationMessage {
 			body,
 			priority,
 			issued_at,
+			acknowledged,
 		}
 	}
 }

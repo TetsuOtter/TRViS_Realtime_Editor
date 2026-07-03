@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 import {
 	broadcastDiagramInfo,
@@ -63,6 +64,7 @@ function intToRgbString(rgb: number): string {
 export function RemoteCommandsPanel() {
 	const [open, setOpen] = useState(false);
 	const [headerColor, setHeaderColor] = useState("#336699");
+	const [notifId, setNotifId] = useState("");
 	const [notifTitle, setNotifTitle] = useState("");
 	const [notifBody, setNotifBody] = useState("");
 	const [notifPriority, setNotifPriority] = useState(0);
@@ -207,6 +209,23 @@ export function RemoteCommandsPanel() {
 					{/* 通告 */}
 					<div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 240 }}>
 						<span style={labelStyle}>通告 (Notification)</span>
+						<div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+							<input
+								type="text"
+								placeholder="ID (空=情報通知 / 指定=受領可能)"
+								value={notifId}
+								onChange={(e) => setNotifId(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<button
+								type="button"
+								onClick={() => setNotifId(uuidv4())}
+								style={buttonStyle}
+								title="受領可能な通告にするための ID を生成"
+							>
+								生成
+							</button>
+						</div>
 						<input
 							type="text"
 							placeholder="タイトル"
@@ -257,6 +276,7 @@ export function RemoteCommandsPanel() {
 									guard(
 										() =>
 											broadcastNotification({
+												id: notifId.trim() || null,
 												title: notifTitle || null,
 												body: notifBody || null,
 												priority: notifPriority,

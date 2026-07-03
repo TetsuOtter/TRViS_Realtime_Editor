@@ -689,9 +689,25 @@ mod tests {
 			Some("本文".into()),
 			1,
 			Some("2026-05-09T01:00:00+09:00".into()),
+			false,
 		))
 		.unwrap();
 		assert!(s.contains(r#""Priority":1"#));
+		assert!(s.contains(r#""Id":"n1""#));
+		assert!(s.contains(r#""Acknowledged":false"#));
+
+		// Acknowledged=true (サーバ再配信で既読扱いにするケース) も serialize される。
+		let acked = serde_json::to_string(&NotificationMessage::new(
+			None,
+			Some("既読通告".into()),
+			None,
+			0,
+			None,
+			true,
+		))
+		.unwrap();
+		assert!(acked.contains(r#""Acknowledged":true"#));
+		assert!(!acked.contains("IssuedAt"));
 
 		let s = serde_json::to_string(&TimeFormatMessage::new(Some("HH:mm".into()))).unwrap();
 		assert!(s.contains(r#""Format":"HH:mm""#));

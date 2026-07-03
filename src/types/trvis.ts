@@ -153,10 +153,7 @@ export interface ServerSelectTrainMessage {
 
 /** TRViS 側 OperationCommandType enum 名と一致させる必要がある */
 export type OperationCommandAction =
-	| "StartOperation"
-	| "EndOperation"
-	| "EnableLocationService"
-	| "DisableLocationService";
+	"StartOperation" | "EndOperation" | "EnableLocationService" | "DisableLocationService";
 
 /** サーバ → クライアント: 運行操作コマンド */
 export interface ServerOperationCommandMessage {
@@ -267,8 +264,7 @@ export interface MonitorFrame {
 
 /** Tauri の `ws-monitor` イベントペイロード */
 export type WsMonitorEvent =
-	| ({ type: "frame" } & MonitorFrame)
-	| { type: "lagged"; skipped: number };
+	({ type: "frame" } & MonitorFrame) | { type: "lagged"; skipped: number };
 
 /** Tauri側 WebSocketサーバから流れてくるイベント */
 export type WsServerEvent =

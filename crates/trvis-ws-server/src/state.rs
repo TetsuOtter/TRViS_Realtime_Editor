@@ -74,6 +74,22 @@ pub enum ServerEvent {
 		client_id: String,
 		diagram_id: Option<String>,
 	},
+	/// クライアントが `MessageType: "SearchTrain"` を送ってきた (v1.1 列車検索 §1)。
+	/// `request_id` が `None` の場合は不正リクエストとして応答しない想定 (相関IDが無いため)。
+	SearchTrain {
+		client_id: String,
+		request_id: Option<String>,
+		train_number: Option<String>,
+	},
+	/// クライアントが `MessageType: "RequestTrainTimetable"` を送ってきた (v1.1 列車検索 §2)。
+	/// `train_id` が `None` の場合は応答しない想定。
+	RequestTrainTimetable {
+		client_id: String,
+		request_id: Option<String>,
+		work_group_id: Option<String>,
+		work_id: Option<String>,
+		train_id: Option<String>,
+	},
 	Error {
 		message: String,
 	},

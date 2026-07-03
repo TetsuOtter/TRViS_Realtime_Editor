@@ -8,8 +8,9 @@ use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use trvis_ws_server::{
 	start, CachedSyncedData, DiagramInfoMessage, HeaderColorMessage, MonitorDirection, MonitorFrame,
-	NotificationMessage, OperationCommandMessage, OutboundMessage, SelectTrainMessage, ServerEvent,
-	ServerHandle, ServerInfoMessage, ServerOptions, ServerTimetableMessage, TimeFormatMessage,
+	NotificationMessage, OperationCommandMessage, OutboundMessage, SearchTrainResponseMessage,
+	SelectTrainMessage, ServerEvent, ServerHandle, ServerInfoMessage, ServerOptions,
+	ServerTimetableMessage, TimeFormatMessage, TrainSearchResultItem,
 };
 
 #[derive(Default)]
@@ -255,10 +256,11 @@ async fn broadcast_server_info(
 	admin: Option<String>,
 	version: Option<String>,
 	protocol_version: Option<String>,
+	features: Option<Vec<String>>,
 ) -> Result<(), String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
-	let msg = ServerInfoMessage::new(name, admin, version, protocol_version);
+	let msg = ServerInfoMessage::new(name, admin, version, protocol_version, features);
 	handle
 		.state
 		.broadcast(OutboundMessage::ServerInfo(msg))
@@ -276,10 +278,11 @@ async fn respond_server_info(
 	admin: Option<String>,
 	version: Option<String>,
 	protocol_version: Option<String>,
+	features: Option<Vec<String>>,
 ) -> Result<bool, String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
-	let msg = ServerInfoMessage::new(name, admin, version, protocol_version);
+	let msg = ServerInfoMessage::new(name, admin, version, protocol_version, features);
 	Ok(
 		handle
 			.state
@@ -325,6 +328,52 @@ async fn respond_diagram_info(
 		handle
 			.state
 			.send_to(&client_id, OutboundMessage::DiagramInfo(msg))
+			.await,
+	)
+}
+
+/// 特定のクライアントだけに `SearchTrainResponse` を返信する (`SearchTrain` の応答用)。
+/// `results` が空でも必ず送信すること (「該当なし」と「無応答」をクライアントが区別するため)。
+/// 戻り値は送信に成功したかどうか (false = 送信先クライアントが既に切断されている)。
+#[tauri::command]
+async fn respond_search_train(
+	state: State<'_, AppState>,
+	client_id: String,
+	request_id: String,
+	results: Vec<TrainSearchResultItem>,
+) -> Result<bool, String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = SearchTrainResponseMessage::new(request_id, results);
+	Ok(
+		handle
+			.state
+			.send_to(&client_id, OutboundMessage::SearchTrainResponse(msg))
+			.await,
+	)
+}
+
+/// 特定のクライアントだけに Train スコープの `Timetable` を送る (`RequestTrainTimetable` の応答用)。
+/// `broadcast_timetable`/`send_initial_timetable_to` と異なり、他クライアントへは影響させず、
+/// 新規接続時の initial キャッシュも更新しない (検索結果はその場限りの表示のため)。
+/// 戻り値は送信に成功したかどうか (false = 送信先クライアントが既に切断されている)。
+#[tauri::command]
+async fn send_train_timetable_to(
+	state: State<'_, AppState>,
+	client_id: String,
+	work_group_id: String,
+	work_id: String,
+	train_id: String,
+	data: Value,
+) -> Result<bool, String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg =
+		ServerTimetableMessage::new_scoped(Some(work_group_id), Some(work_id), Some(train_id), data);
+	Ok(
+		handle
+			.state
+			.send_to(&client_id, OutboundMessage::Timetable(msg))
 			.await,
 	)
 }
@@ -513,6 +562,30 @@ fn server_event_to_json(ev: &ServerEvent) -> Value {
 				"clientId": client_id,
 				"diagramId": diagram_id,
 		}),
+		ServerEvent::SearchTrain {
+			client_id,
+			request_id,
+			train_number,
+		} => serde_json::json!({
+				"type": "search-train",
+				"clientId": client_id,
+				"requestId": request_id,
+				"trainNumber": train_number,
+		}),
+		ServerEvent::RequestTrainTimetable {
+			client_id,
+			request_id,
+			work_group_id,
+			work_id,
+			train_id,
+		} => serde_json::json!({
+				"type": "request-train-timetable",
+				"clientId": client_id,
+				"requestId": request_id,
+				"workGroupId": work_group_id,
+				"workId": work_id,
+				"trainId": train_id,
+		}),
 		ServerEvent::Error { message } => serde_json::json!({
 				"type": "error", "message": message
 		}),
@@ -553,6 +626,8 @@ pub fn run() {
 			respond_server_info,
 			broadcast_diagram_info,
 			respond_diagram_info,
+			respond_search_train,
+			send_train_timetable_to,
 			set_synced_data,
 			set_monitor_enabled,
 			send_raw_message,

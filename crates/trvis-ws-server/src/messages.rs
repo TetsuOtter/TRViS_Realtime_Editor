@@ -135,6 +135,10 @@ pub struct ServerInfoMessage {
 	pub version: Option<String>,
 	#[serde(rename = "ProtocolVersion", skip_serializing_if = "Option::is_none")]
 	pub protocol_version: Option<String>,
+	/// 拡張機能ネゴシエーション (v1.1)。既知の機能 ID は `"TrainSearch"`。
+	/// 省略/null は「拡張機能なし」を意味する。
+	#[serde(rename = "Features", skip_serializing_if = "Option::is_none")]
+	pub features: Option<Vec<String>>,
 }
 
 impl ServerInfoMessage {
@@ -143,6 +147,7 @@ impl ServerInfoMessage {
 		admin: Option<String>,
 		version: Option<String>,
 		protocol_version: Option<String>,
+		features: Option<Vec<String>>,
 	) -> Self {
 		Self {
 			message_type: "ServerInfo".into(),
@@ -150,6 +155,7 @@ impl ServerInfoMessage {
 			admin,
 			version,
 			protocol_version,
+			features,
 		}
 	}
 }
@@ -320,6 +326,57 @@ impl TimeFormatMessage {
 	}
 }
 
+/// `SearchTrainResponse` の候補 1 件。
+/// 完全な時刻表 (`TrainData`) は含まず、確定時に `RequestTrainTimetable` で別途取得する
+/// (TRViS 本体 v1.1 の 2 段階フローに準拠)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainSearchResultItem {
+	#[serde(rename = "WorkGroupId")]
+	pub work_group_id: Option<String>,
+	#[serde(rename = "WorkId")]
+	pub work_id: Option<String>,
+	#[serde(rename = "TrainId")]
+	pub train_id: Option<String>,
+	#[serde(rename = "TrainNumber")]
+	pub train_number: Option<String>,
+	#[serde(rename = "WorkName")]
+	pub work_name: Option<String>,
+	/// -1 = Inbound / 1 = Outbound。
+	#[serde(rename = "Direction")]
+	pub direction: Option<i32>,
+	#[serde(rename = "StartStationName")]
+	pub start_station_name: Option<String>,
+	#[serde(rename = "StartTime")]
+	pub start_time: Option<String>,
+	#[serde(rename = "EndStationName")]
+	pub end_station_name: Option<String>,
+	#[serde(rename = "EndTime")]
+	pub end_time: Option<String>,
+}
+
+/// サーバ → クライアント の SearchTrainResponse メッセージ (v1.1)。
+/// `RequestId` はクライアントが送ってきた `SearchTrain.RequestId` をそのまま echo する。
+/// `Results` は該当0件でも必ず送る (空配列 = 「該当なし」、無応答 = タイムアウトと区別するため)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchTrainResponseMessage {
+	#[serde(rename = "MessageType")]
+	pub message_type: String,
+	#[serde(rename = "RequestId")]
+	pub request_id: String,
+	#[serde(rename = "Results")]
+	pub results: Vec<TrainSearchResultItem>,
+}
+
+impl SearchTrainResponseMessage {
+	pub fn new(request_id: String, results: Vec<TrainSearchResultItem>) -> Self {
+		Self {
+			message_type: "SearchTrainResponse".into(),
+			request_id,
+			results,
+		}
+	}
+}
+
 /// 上位(UI/Tauri) からサーバに送信を依頼するメッセージ。
 #[derive(Debug, Clone)]
 pub enum OutboundMessage {
@@ -332,6 +389,7 @@ pub enum OutboundMessage {
 	HeaderColor(HeaderColorMessage),
 	Notification(NotificationMessage),
 	TimeFormat(TimeFormatMessage),
+	SearchTrainResponse(SearchTrainResponseMessage),
 	/// デバッグ用: 任意のテキストを一切加工せずそのまま送る。
 	/// 通信モニタの手動送信機能で使用する。JSON 妥当性検証はしない。
 	Raw(String),
@@ -349,6 +407,7 @@ impl OutboundMessage {
 			OutboundMessage::HeaderColor(m) => serde_json::to_string(m),
 			OutboundMessage::Notification(m) => serde_json::to_string(m),
 			OutboundMessage::TimeFormat(m) => serde_json::to_string(m),
+			OutboundMessage::SearchTrainResponse(m) => serde_json::to_string(m),
 			OutboundMessage::Raw(s) => Ok(s.clone()),
 		}
 	}

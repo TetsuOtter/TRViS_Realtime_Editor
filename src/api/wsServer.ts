@@ -10,6 +10,7 @@ import type {
 	WorkGroupData,
 	WorkData,
 	TrainData,
+	TrainSearchResultSummary,
 	WsMonitorEvent,
 	WsServerEvent,
 } from "../types/trvis";
@@ -213,6 +214,7 @@ export async function broadcastServerInfo(args: {
 	admin?: string | null;
 	version?: string | null;
 	protocolVersion?: string | null;
+	features?: string[] | null;
 }): Promise<void> {
 	const t = await loadTauri();
 	if (!t) return;
@@ -221,6 +223,7 @@ export async function broadcastServerInfo(args: {
 		admin: args.admin ?? null,
 		version: args.version ?? null,
 		protocolVersion: args.protocolVersion ?? null,
+		features: args.features ?? null,
 	});
 }
 
@@ -234,6 +237,7 @@ export async function respondServerInfo(args: {
 	admin?: string | null;
 	version?: string | null;
 	protocolVersion?: string | null;
+	features?: string[] | null;
 }): Promise<boolean> {
 	const t = await loadTauri();
 	if (!t) return false;
@@ -243,6 +247,7 @@ export async function respondServerInfo(args: {
 		admin: args.admin ?? null,
 		version: args.version ?? null,
 		protocolVersion: args.protocolVersion ?? null,
+		features: args.features ?? null,
 	});
 }
 
@@ -282,6 +287,49 @@ export async function respondDiagramInfo(args: {
 		name: args.name ?? null,
 		description: args.description ?? null,
 		workGroupIds: args.workGroupIds ?? null,
+	});
+}
+
+/**
+ * 特定のクライアントだけに `SearchTrainResponse` を返信する (`SearchTrain` への応答, v1.1)。
+ * `results` が空でも必ず送ること (「該当なし」と「無応答/タイムアウト」をクライアントが区別するため)。
+ * 戻り値は送信先クライアントがまだ接続されていれば true。
+ */
+export async function respondSearchTrain(args: {
+	clientId: string;
+	requestId: string;
+	results: TrainSearchResultSummary[];
+}): Promise<boolean> {
+	const t = await loadTauri();
+	if (!t) return false;
+	return t.invoke<boolean>("respond_search_train", {
+		clientId: args.clientId,
+		requestId: args.requestId,
+		results: args.results,
+	});
+}
+
+/**
+ * 特定のクライアントだけに Train スコープの `Timetable` を送る (`RequestTrainTimetable` への応答, v1.1)。
+ * `broadcastTrain`/`sendInitialTimetableTo` と異なり、他クライアントへは影響させず、
+ * 新規接続時の initial キャッシュも更新しない (検索結果はその場限りの表示のため)。
+ * 戻り値は送信先クライアントがまだ接続されていれば true。
+ */
+export async function sendTrainTimetableTo(args: {
+	clientId: string;
+	workGroupId: string;
+	workId: string;
+	train: TrainData;
+}): Promise<boolean> {
+	const t = await loadTauri();
+	if (!t) return false;
+	if (!args.train.Id) throw new Error("Train に Id が必要");
+	return t.invoke<boolean>("send_train_timetable_to", {
+		clientId: args.clientId,
+		workGroupId: args.workGroupId,
+		workId: args.workId,
+		trainId: args.train.Id,
+		data: args.train,
 	});
 }
 

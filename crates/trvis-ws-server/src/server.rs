@@ -289,9 +289,11 @@ async fn process_client_text(state: &SharedState, client_id: &str, text: &str) {
 	};
 
 	// `MessageType` がある場合は要求メッセージとしてルーティングする。
-	// TRViS 本体側 (commit 8c101e4 以降) は次の要求を送ってくる:
+	// TRViS 本体側 (commit 8c101e4 以降 / v1.1 列車検索対応後) は次の要求を送ってくる:
 	//   - {"MessageType":"RequestServerInfo"}
 	//   - {"MessageType":"RequestDiagramInfo","DiagramId":...}  (DiagramId は省略可)
+	//   - {"MessageType":"SearchTrain","RequestId":...,"TrainNumber":...}
+	//   - {"MessageType":"RequestTrainTimetable","RequestId":...,"WorkGroupId":...,"WorkId":...,"TrainId":...}
 	// その他の MessageType は将来拡張用として無視する (エコーバック等の安全側倒し)。
 	if let Some(message_type) = parsed.get("MessageType").and_then(|v| v.as_str()) {
 		match message_type {
@@ -308,6 +310,46 @@ async fn process_client_text(state: &SharedState, client_id: &str, text: &str) {
 				let _ = state.events.send(ServerEvent::RequestDiagramInfo {
 					client_id: client_id.to_string(),
 					diagram_id,
+				});
+			}
+			"SearchTrain" => {
+				let request_id = parsed
+					.get("RequestId")
+					.and_then(|v| v.as_str())
+					.map(|s| s.to_string());
+				let train_number = parsed
+					.get("TrainNumber")
+					.and_then(|v| v.as_str())
+					.map(|s| s.to_string());
+				let _ = state.events.send(ServerEvent::SearchTrain {
+					client_id: client_id.to_string(),
+					request_id,
+					train_number,
+				});
+			}
+			"RequestTrainTimetable" => {
+				let request_id = parsed
+					.get("RequestId")
+					.and_then(|v| v.as_str())
+					.map(|s| s.to_string());
+				let work_group_id = parsed
+					.get("WorkGroupId")
+					.and_then(|v| v.as_str())
+					.map(|s| s.to_string());
+				let work_id = parsed
+					.get("WorkId")
+					.and_then(|v| v.as_str())
+					.map(|s| s.to_string());
+				let train_id = parsed
+					.get("TrainId")
+					.and_then(|v| v.as_str())
+					.map(|s| s.to_string());
+				let _ = state.events.send(ServerEvent::RequestTrainTimetable {
+					client_id: client_id.to_string(),
+					request_id,
+					work_group_id,
+					work_id,
+					train_id,
 				});
 			}
 			_ => {}
@@ -481,10 +523,77 @@ mod tests {
 	}
 
 	#[tokio::test]
+	async fn server_routes_train_search_messages_to_events() {
+		let handle = start(ServerOptions {
+			host: "127.0.0.1".into(),
+			port: 0,
+			sync_interval: None,
+		})
+		.await
+		.unwrap();
+		let mut events = handle.state.subscribe();
+
+		let url = format!("ws://127.0.0.1:{}/ws", handle.bound_port);
+		let (mut ws, _resp) = connect_async(&url).await.unwrap();
+
+		// SearchTrain
+		ws.send(Message::Text(
+			r#"{"MessageType":"SearchTrain","RequestId":"req-1","TrainNumber":"1234"}"#.into(),
+		))
+		.await
+		.unwrap();
+		// RequestTrainTimetable
+		ws.send(Message::Text(
+			r#"{"MessageType":"RequestTrainTimetable","RequestId":"req-2","WorkGroupId":"wg-1","WorkId":"w-1","TrainId":"t-1"}"#.into(),
+		))
+		.await
+		.unwrap();
+
+		let mut got_search = false;
+		let mut got_timetable_request = false;
+		for _ in 0..30 {
+			match events.recv().await {
+				Ok(ServerEvent::SearchTrain {
+					request_id,
+					train_number,
+					..
+				}) => {
+					assert_eq!(request_id.as_deref(), Some("req-1"));
+					assert_eq!(train_number.as_deref(), Some("1234"));
+					got_search = true;
+				}
+				Ok(ServerEvent::RequestTrainTimetable {
+					request_id,
+					work_group_id,
+					work_id,
+					train_id,
+					..
+				}) => {
+					assert_eq!(request_id.as_deref(), Some("req-2"));
+					assert_eq!(work_group_id.as_deref(), Some("wg-1"));
+					assert_eq!(work_id.as_deref(), Some("w-1"));
+					assert_eq!(train_id.as_deref(), Some("t-1"));
+					got_timetable_request = true;
+				}
+				_ => {}
+			}
+			if got_search && got_timetable_request {
+				break;
+			}
+		}
+		assert!(got_search, "SearchTrain が来なかった");
+		assert!(got_timetable_request, "RequestTrainTimetable が来なかった");
+
+		ws.close(None).await.ok();
+		handle.shutdown().await;
+	}
+
+	#[tokio::test]
 	async fn server_serializes_remote_command_messages() {
 		use crate::messages::{
 			DiagramInfoMessage, HeaderColorMessage, NotificationMessage, OperationCommandMessage,
-			SelectTrainMessage, ServerInfoMessage, TimeFormatMessage,
+			SearchTrainResponseMessage, SelectTrainMessage, ServerInfoMessage, TimeFormatMessage,
+			TrainSearchResultItem,
 		};
 		// 主要な outbound 型が期待した JSON フィールドを出力することを最小チェック。
 		let s = serde_json::to_string(&ServerInfoMessage::new(
@@ -492,11 +601,26 @@ mod tests {
 			None,
 			Some("1.0".into()),
 			None,
+			None,
 		))
 		.unwrap();
 		assert!(s.contains(r#""MessageType":"ServerInfo""#));
 		assert!(s.contains(r#""Name":"srv""#));
 		assert!(s.contains(r#""Version":"1.0""#));
+		assert!(
+			!s.contains("Features"),
+			"Features 省略時はキー自体を出さない"
+		);
+
+		let s = serde_json::to_string(&ServerInfoMessage::new(
+			Some("srv".into()),
+			None,
+			Some("1.0".into()),
+			Some("1.1".into()),
+			Some(vec!["TrainSearch".into()]),
+		))
+		.unwrap();
+		assert!(s.contains(r#""Features":["TrainSearch"]"#));
 
 		let s = serde_json::to_string(&DiagramInfoMessage::new(
 			Some("d1".into()),
@@ -546,5 +670,31 @@ mod tests {
 		// Format は null 値も出力する (端末既定リセットを意味する) — skip_serializing_if が無いことを確認
 		let s = serde_json::to_string(&TimeFormatMessage::new(None)).unwrap();
 		assert!(s.contains(r#""Format":null"#));
+
+		// SearchTrainResponse: RequestId を echo し、0件でも Results キーを出す (skip しない)。
+		let s =
+			serde_json::to_string(&SearchTrainResponseMessage::new("req-1".into(), vec![])).unwrap();
+		assert!(s.contains(r#""MessageType":"SearchTrainResponse""#));
+		assert!(s.contains(r#""RequestId":"req-1""#));
+		assert!(s.contains(r#""Results":[]"#));
+
+		let s = serde_json::to_string(&SearchTrainResponseMessage::new(
+			"req-2".into(),
+			vec![TrainSearchResultItem {
+				work_group_id: Some("wg-1".into()),
+				work_id: Some("w-1".into()),
+				train_id: Some("t-1".into()),
+				train_number: Some("1234".into()),
+				work_name: Some("1行路".into()),
+				direction: Some(1),
+				start_station_name: Some("東京".into()),
+				start_time: Some("09:00".into()),
+				end_station_name: Some("大阪".into()),
+				end_time: Some("12:30".into()),
+			}],
+		))
+		.unwrap();
+		assert!(s.contains(r#""TrainId":"t-1""#));
+		assert!(s.contains(r#""Direction":1"#));
 	}
 }

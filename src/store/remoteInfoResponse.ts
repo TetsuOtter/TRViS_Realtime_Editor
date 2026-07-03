@@ -15,10 +15,13 @@ export interface ServerInfoResponse {
 	admin: string | null;
 	version: string | null;
 	protocolVersion: string | null;
+	/** `TrainSearchEnabled` が true のときのみ `["TrainSearch"]`、それ以外は null (拡張機能なし)。 */
+	features: string[] | null;
 }
 
 /**
- * `Version` 空欄時はアプリ版を、`ProtocolVersion` 空欄時は現行 "1.0" を補う。
+ * `Version` 空欄時はアプリ版を、`ProtocolVersion` 空欄時は現行 "1.1" を補う。
+ * `Features` は `TrainSearchEnabled` に従って `["TrainSearch"]` / null を返す。
  */
 export function buildServerInfoResponse(
 	info: EditorServerInfo,
@@ -28,7 +31,8 @@ export function buildServerInfoResponse(
 		name: trimOrNull(info.Name),
 		admin: trimOrNull(info.Admin),
 		version: trimOrNull(info.Version) ?? appVersion,
-		protocolVersion: trimOrNull(info.ProtocolVersion) ?? "1.0",
+		protocolVersion: trimOrNull(info.ProtocolVersion) ?? "1.1",
+		features: info.TrainSearchEnabled ? ["TrainSearch"] : null,
 	};
 }
 

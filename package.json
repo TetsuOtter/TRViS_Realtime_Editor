@@ -50,7 +50,7 @@
 		"qrcode": "^1.5.4",
 		"react": "19.2.7",
 		"react-dom": "19.2.7",
-		"react-error-boundary": "^6.1.1",
+		"react-error-boundary": "^6.1.2",
 		"uuid": "^14.0.0",
 		"zustand": "5.0.13"
 	},

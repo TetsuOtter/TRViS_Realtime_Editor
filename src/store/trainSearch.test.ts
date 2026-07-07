@@ -95,26 +95,29 @@ describe("searchTrainsByNumber", () => {
 		},
 	];
 
-	it("既定 (matchMode 省略) は前方一致 (例: '22' で '22M' は見つかるが 'M22' は見つからない)", () => {
+	it("既定 (matchMode 省略) は数字部分の前方一致 (例: '22' で '22M' は見つかるが '32M' は見つからない)", () => {
 		expect(searchTrainsByNumber(singleTrainWorkGroups("22M"), "22")).toHaveLength(1);
-		expect(searchTrainsByNumber(singleTrainWorkGroups("M22"), "22")).toEqual([]);
+		expect(searchTrainsByNumber(singleTrainWorkGroups("32M"), "22")).toEqual([]);
 	});
 
-	it("matchMode: 'Prefix' は前方一致", () => {
+	it("matchMode: 'Prefix' は数字部分の前方一致", () => {
 		const results = searchTrainsByNumber(singleTrainWorkGroups("22M"), "22", "Prefix");
 		expect(results).toHaveLength(1);
-		expect(searchTrainsByNumber(singleTrainWorkGroups("M22"), "22", "Prefix")).toEqual([]);
+		expect(searchTrainsByNumber(singleTrainWorkGroups("32M"), "22", "Prefix")).toEqual([]);
 	});
 
-	it("matchMode: 'Contains' は中間一致 (例: '22' で '2022M' が見つかる)", () => {
+	it("matchMode: 'Contains' は数字部分の中間一致 (例: '22' で '2022M' が見つかる)", () => {
 		const results = searchTrainsByNumber(singleTrainWorkGroups("2022M"), "22", "Contains");
 		expect(results).toHaveLength(1);
 		expect(results[0].TrainNumber).toBe("2022M");
 	});
 
-	it("matchMode: 'Exact' は完全一致のみ (例: '22M' に '22' はマッチしない)", () => {
-		expect(searchTrainsByNumber(singleTrainWorkGroups("22M"), "22", "Exact")).toEqual([]);
-		expect(searchTrainsByNumber(singleTrainWorkGroups("22M"), "22M", "Exact")).toHaveLength(1);
+	it("matchMode: 'Exact' は数字部分の完全一致 (英字サフィックスは無視するため '1M' は '1' でヒットする)", () => {
+		const results = searchTrainsByNumber(singleTrainWorkGroups("1M"), "1", "Exact");
+		expect(results).toHaveLength(1);
+		expect(results[0].TrainNumber).toBe("1M");
+		// 数字部分自体が異なればヒットしない
+		expect(searchTrainsByNumber(singleTrainWorkGroups("12M"), "1", "Exact")).toEqual([]);
 	});
 
 	it("未知の matchMode は前方一致として扱う", () => {
@@ -123,24 +126,18 @@ describe("searchTrainsByNumber", () => {
 		expect(results).toHaveLength(1);
 	});
 
-	it("大文字小文字を区別しない", () => {
-		const results = searchTrainsByNumber(
-			[
-				{
-					Id: "wg",
-					Name: "WG",
-					Works: [
-						{
-							Id: "w",
-							Name: "W",
-							Trains: [{ Id: "t", TrainNumber: "AB12", Direction: 1, TimetableRows: [] }],
-						},
-					],
-				},
-			],
-			"ab12",
-		);
+	it("列番の英字部分 (大文字小文字問わず) は比較対象に含めない", () => {
+		expect(searchTrainsByNumber(singleTrainWorkGroups("AB12"), "12")).toHaveLength(1);
+		expect(searchTrainsByNumber(singleTrainWorkGroups("ab12"), "12")).toHaveLength(1);
+	});
+
+	it("検索語に含まれる英字も無視する (例: 'M1' は '1' として扱われる)", () => {
+		const results = searchTrainsByNumber(singleTrainWorkGroups("1M"), "M1", "Exact");
 		expect(results).toHaveLength(1);
+	});
+
+	it("検索語に数字が含まれない場合は空配列を返す", () => {
+		expect(searchTrainsByNumber(workGroups, "abc")).toEqual([]);
 	});
 
 	it("空白のみの検索語は空配列を返す", () => {

@@ -10,23 +10,26 @@ import type {
 	WorkGroupData,
 } from "../types/trvis";
 
+/** 列番から数字以外の文字 (英字サフィックス等、例: "1M" の "M") を取り除く。 */
+const extractDigits = (s: string): string => s.replace(/\D+/g, "");
+
 /**
- * `MatchMode` の意味論に従い、列番が検索語に一致するかを判定する。
- * 省略・未知の値は "Prefix" として扱う (プロトコル準拠)。大文字小文字は区別しない。
+ * `MatchMode` の意味論に従い、列番の数字部分が検索語 (の数字部分) に一致するかを判定する。
+ * 列番の英字サフィックス (例: "1M" の "M") は比較対象に含めない — 「1」で完全一致検索した
+ * とき「1M」がヒットするのはこのため。省略・未知の値は "Prefix" として扱う (プロトコル準拠)。
  */
 const matchesTrainNumber = (
-	candidate: string,
-	needleLower: string,
+	candidateDigits: string,
+	needleDigits: string,
 	matchMode: TrainSearchMatchMode | null | undefined,
 ): boolean => {
-	const candidateLower = candidate.toLowerCase();
 	switch (matchMode) {
 		case "Contains":
-			return candidateLower.includes(needleLower);
+			return candidateDigits.includes(needleDigits);
 		case "Exact":
-			return candidateLower === needleLower;
+			return candidateDigits === needleDigits;
 		default:
-			return candidateLower.startsWith(needleLower);
+			return candidateDigits.startsWith(needleDigits);
 	}
 };
 
@@ -59,26 +62,25 @@ const deriveStartEnd = (
 };
 
 /**
- * 全 WorkGroup/Work/Train を走査し、列番が `matchMode` に従って一致する候補を列挙する。
- * 同一列番で複数行路にまたがる候補もすべて返す (TRViS 本体 PR #304 の想定どおり)。
- * 大文字小文字は区別しない。`matchMode` 省略・未知の値は "Prefix" (前方一致、既定) として扱う
- * (プロトコル準拠。準拠サーバーは Prefix/Contains/Exact の3種すべてを実装する)。
+ * 全 WorkGroup/Work/Train を走査し、列番の数字部分が `matchMode` に従って一致する候補を
+ * 列挙する (英字サフィックスは比較対象外)。同一列番で複数行路にまたがる候補もすべて返す
+ * (TRViS 本体 PR #304 の想定どおり)。`matchMode` 省略・未知の値は "Prefix" (前方一致、既定)
+ * として扱う (プロトコル準拠。準拠サーバーは Prefix/Contains/Exact の3種すべてを実装する)。
  */
 export function searchTrainsByNumber(
 	workGroups: WorkGroupData[],
 	trainNumber: string,
 	matchMode?: TrainSearchMatchMode | null,
 ): TrainSearchResultSummary[] {
-	const needle = trainNumber.trim();
-	if (needle === "") return [];
-	const needleLower = needle.toLowerCase();
+	const needleDigits = extractDigits(trainNumber);
+	if (needleDigits === "") return [];
 
 	const results: TrainSearchResultSummary[] = [];
 	for (const wg of workGroups) {
 		for (const work of wg.Works) {
 			for (const train of work.Trains) {
-				const candidate = (train.TrainNumber ?? "").trim();
-				if (!matchesTrainNumber(candidate, needleLower, matchMode)) continue;
+				const candidateDigits = extractDigits(train.TrainNumber ?? "");
+				if (!matchesTrainNumber(candidateDigits, needleDigits, matchMode)) continue;
 				const { startStationName, startTime, endStationName, endTime } = deriveStartEnd(train);
 				results.push({
 					WorkGroupId: wg.Id ?? null,

@@ -10,6 +10,15 @@ import {
 import { useEditorStore } from "./editorStore";
 import { buildServerInfoResponse, decideDiagramInfoResponse } from "./remoteInfoResponse";
 import { findTrainForTimetable, searchTrainsByNumber } from "./trainSearch";
+import type { TrainSearchMatchMode } from "../types/trvis";
+
+const VALID_MATCH_MODES: readonly TrainSearchMatchMode[] = ["Prefix", "Contains", "Exact"];
+
+/** 未知の値は "Prefix" 扱いにするため null を返す (`searchTrainsByNumber` の既定に委ねる)。 */
+const normalizeMatchMode = (matchMode: string | null): TrainSearchMatchMode | null =>
+	VALID_MATCH_MODES.includes(matchMode as TrainSearchMatchMode)
+		? (matchMode as TrainSearchMatchMode)
+		: null;
 
 declare const __APP_VERSION__: string | undefined;
 
@@ -17,7 +26,7 @@ declare const __APP_VERSION__: string | undefined;
  * TRViS 本体 (commit 8c101e4 以降 / v1.1 列車検索対応後) は WebSocket 経由で
  *   - `{"MessageType":"RequestServerInfo"}`
  *   - `{"MessageType":"RequestDiagramInfo","DiagramId"?:string}`
- *   - `{"MessageType":"SearchTrain","RequestId":string,"TrainNumber":string}`
+ *   - `{"MessageType":"SearchTrain","RequestId":string,"TrainNumber":string,"MatchMode"?:string}`
  *   - `{"MessageType":"RequestTrainTimetable","RequestId":string,"WorkGroupId":string,"WorkId":string,"TrainId":string}`
  * を送ってくることがある。本フックはそれら要求イベントを購読し、
  * ストアに設定されたサーバー情報 / ダイヤ情報 / 列車検索結果を要求元クライアントへ返信する。
@@ -61,6 +70,7 @@ export function useRemoteRequestResponder() {
 					const results = searchTrainsByNumber(
 						useEditorStore.getState().workGroups,
 						ev.trainNumber ?? "",
+						normalizeMatchMode(ev.matchMode),
 					);
 					// 0件でも必ず応答する (「該当なし」とタイムアウトをクライアントが区別するため)。
 					respondSearchTrain({ clientId: ev.clientId, requestId: ev.requestId, results }).catch(

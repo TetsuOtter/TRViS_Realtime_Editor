@@ -292,7 +292,7 @@ async fn process_client_text(state: &SharedState, client_id: &str, text: &str) {
 	// TRViS 本体側 (commit 8c101e4 以降 / v1.1 列車検索対応後) は次の要求を送ってくる:
 	//   - {"MessageType":"RequestServerInfo"}
 	//   - {"MessageType":"RequestDiagramInfo","DiagramId":...}  (DiagramId は省略可)
-	//   - {"MessageType":"SearchTrain","RequestId":...,"TrainNumber":...}
+	//   - {"MessageType":"SearchTrain","RequestId":...,"TrainNumber":...,"MatchMode":...}  (MatchMode は省略可)
 	//   - {"MessageType":"RequestTrainTimetable","RequestId":...,"WorkGroupId":...,"WorkId":...,"TrainId":...}
 	// その他の MessageType は将来拡張用として無視する (エコーバック等の安全側倒し)。
 	if let Some(message_type) = parsed.get("MessageType").and_then(|v| v.as_str()) {
@@ -321,10 +321,15 @@ async fn process_client_text(state: &SharedState, client_id: &str, text: &str) {
 					.get("TrainNumber")
 					.and_then(|v| v.as_str())
 					.map(|s| s.to_string());
+				let match_mode = parsed
+					.get("MatchMode")
+					.and_then(|v| v.as_str())
+					.map(|s| s.to_string());
 				let _ = state.events.send(ServerEvent::SearchTrain {
 					client_id: client_id.to_string(),
 					request_id,
 					train_number,
+					match_mode,
 				});
 			}
 			"RequestTrainTimetable" => {
@@ -536,9 +541,16 @@ mod tests {
 		let url = format!("ws://127.0.0.1:{}/ws", handle.bound_port);
 		let (mut ws, _resp) = connect_async(&url).await.unwrap();
 
-		// SearchTrain
+		// SearchTrain (MatchMode 明示)
 		ws.send(Message::Text(
-			r#"{"MessageType":"SearchTrain","RequestId":"req-1","TrainNumber":"1234"}"#.into(),
+			r#"{"MessageType":"SearchTrain","RequestId":"req-1","TrainNumber":"1234","MatchMode":"Contains"}"#
+				.into(),
+		))
+		.await
+		.unwrap();
+		// SearchTrain (MatchMode 省略 → None として渡ってくるはず)
+		ws.send(Message::Text(
+			r#"{"MessageType":"SearchTrain","RequestId":"req-3","TrainNumber":"5678"}"#.into(),
 		))
 		.await
 		.unwrap();
@@ -550,17 +562,29 @@ mod tests {
 		.unwrap();
 
 		let mut got_search = false;
+		let mut got_search_default_match_mode = false;
 		let mut got_timetable_request = false;
 		for _ in 0..30 {
 			match events.recv().await {
 				Ok(ServerEvent::SearchTrain {
 					request_id,
 					train_number,
+					match_mode,
 					..
-				}) => {
-					assert_eq!(request_id.as_deref(), Some("req-1"));
+				}) if request_id.as_deref() == Some("req-1") => {
 					assert_eq!(train_number.as_deref(), Some("1234"));
+					assert_eq!(match_mode.as_deref(), Some("Contains"));
 					got_search = true;
+				}
+				Ok(ServerEvent::SearchTrain {
+					request_id,
+					train_number,
+					match_mode,
+					..
+				}) if request_id.as_deref() == Some("req-3") => {
+					assert_eq!(train_number.as_deref(), Some("5678"));
+					assert_eq!(match_mode, None, "MatchMode 省略時は None が渡るはず");
+					got_search_default_match_mode = true;
 				}
 				Ok(ServerEvent::RequestTrainTimetable {
 					request_id,
@@ -577,11 +601,15 @@ mod tests {
 				}
 				_ => {}
 			}
-			if got_search && got_timetable_request {
+			if got_search && got_search_default_match_mode && got_timetable_request {
 				break;
 			}
 		}
-		assert!(got_search, "SearchTrain が来なかった");
+		assert!(got_search, "SearchTrain (MatchMode付き) が来なかった");
+		assert!(
+			got_search_default_match_mode,
+			"SearchTrain (MatchMode省略) が来なかった"
+		);
 		assert!(got_timetable_request, "RequestTrainTimetable が来なかった");
 
 		ws.close(None).await.ok();

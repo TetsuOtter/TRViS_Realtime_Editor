@@ -81,6 +81,48 @@ describe("searchTrainsByNumber", () => {
 		expect(searchTrainsByNumber(workGroups, "0000")).toEqual([]);
 	});
 
+	const singleTrainWorkGroups = (trainNumber: string): WorkGroupData[] => [
+		{
+			Id: "wg",
+			Name: "WG",
+			Works: [
+				{
+					Id: "w",
+					Name: "W",
+					Trains: [{ Id: "t", TrainNumber: trainNumber, Direction: 1, TimetableRows: [] }],
+				},
+			],
+		},
+	];
+
+	it("既定 (matchMode 省略) は前方一致 (例: '22' で '22M' は見つかるが 'M22' は見つからない)", () => {
+		expect(searchTrainsByNumber(singleTrainWorkGroups("22M"), "22")).toHaveLength(1);
+		expect(searchTrainsByNumber(singleTrainWorkGroups("M22"), "22")).toEqual([]);
+	});
+
+	it("matchMode: 'Prefix' は前方一致", () => {
+		const results = searchTrainsByNumber(singleTrainWorkGroups("22M"), "22", "Prefix");
+		expect(results).toHaveLength(1);
+		expect(searchTrainsByNumber(singleTrainWorkGroups("M22"), "22", "Prefix")).toEqual([]);
+	});
+
+	it("matchMode: 'Contains' は中間一致 (例: '22' で '2022M' が見つかる)", () => {
+		const results = searchTrainsByNumber(singleTrainWorkGroups("2022M"), "22", "Contains");
+		expect(results).toHaveLength(1);
+		expect(results[0].TrainNumber).toBe("2022M");
+	});
+
+	it("matchMode: 'Exact' は完全一致のみ (例: '22M' に '22' はマッチしない)", () => {
+		expect(searchTrainsByNumber(singleTrainWorkGroups("22M"), "22", "Exact")).toEqual([]);
+		expect(searchTrainsByNumber(singleTrainWorkGroups("22M"), "22M", "Exact")).toHaveLength(1);
+	});
+
+	it("未知の matchMode は前方一致として扱う", () => {
+		// @ts-expect-error 未知の値を意図的に渡す (サーバー間の後方互換テスト)
+		const results = searchTrainsByNumber(singleTrainWorkGroups("22M"), "22", "Unknown");
+		expect(results).toHaveLength(1);
+	});
+
 	it("大文字小文字を区別しない", () => {
 		const results = searchTrainsByNumber(
 			[

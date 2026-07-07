@@ -566,11 +566,13 @@ fn server_event_to_json(ev: &ServerEvent) -> Value {
 			client_id,
 			request_id,
 			train_number,
+			match_mode,
 		} => serde_json::json!({
 				"type": "search-train",
 				"clientId": client_id,
 				"requestId": request_id,
 				"trainNumber": train_number,
+				"matchMode": match_mode,
 		}),
 		ServerEvent::RequestTrainTimetable {
 			client_id,

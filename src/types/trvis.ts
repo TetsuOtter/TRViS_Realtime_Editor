@@ -194,6 +194,12 @@ export interface ServerTimeFormatMessage {
 }
 
 /**
+ * `SearchTrain.MatchMode` (v1.1 列番検索、一致方式)。
+ * 前方一致 (既定) / 中間一致 / 完全一致。数字部分 (列車番号) のみが対象。
+ */
+export type TrainSearchMatchMode = "Prefix" | "Contains" | "Exact";
+
+/**
  * `SearchTrain` の候補 1 件のサマリ (v1.1)。完全な時刻表は含まず、
  * 確定時に `RequestTrainTimetable` で別途取得する (2段階フロー)。
  */
@@ -321,6 +327,8 @@ export type WsServerEvent =
 			clientId: string;
 			requestId: string | null;
 			trainNumber: string | null;
+			/** 省略時・未知の値は "Prefix" (前方一致) として扱う。 */
+			matchMode: string | null;
 	  }
 	| {
 			type: "request-train-timetable";

@@ -3,7 +3,32 @@
  * (副作用を持つ送信処理から分離してテスト可能にしてある。)
  */
 
-import type { TrainData, TrainSearchResultSummary, WorkGroupData } from "../types/trvis";
+import type {
+	TrainData,
+	TrainSearchMatchMode,
+	TrainSearchResultSummary,
+	WorkGroupData,
+} from "../types/trvis";
+
+/**
+ * `MatchMode` の意味論に従い、列番が検索語に一致するかを判定する。
+ * 省略・未知の値は "Prefix" として扱う (プロトコル準拠)。大文字小文字は区別しない。
+ */
+const matchesTrainNumber = (
+	candidate: string,
+	needleLower: string,
+	matchMode: TrainSearchMatchMode | null | undefined,
+): boolean => {
+	const candidateLower = candidate.toLowerCase();
+	switch (matchMode) {
+		case "Contains":
+			return candidateLower.includes(needleLower);
+		case "Exact":
+			return candidateLower === needleLower;
+		default:
+			return candidateLower.startsWith(needleLower);
+	}
+};
 
 const trimOrNull = (s: string | null | undefined): string | null => {
 	const v = (s ?? "").trim();
@@ -34,13 +59,15 @@ const deriveStartEnd = (
 };
 
 /**
- * 全 WorkGroup/Work/Train を走査し、列番が完全一致する候補を列挙する。
+ * 全 WorkGroup/Work/Train を走査し、列番が `matchMode` に従って一致する候補を列挙する。
  * 同一列番で複数行路にまたがる候補もすべて返す (TRViS 本体 PR #304 の想定どおり)。
- * 大文字小文字は区別しない (ReferenceServer の `OrdinalIgnoreCase` に合わせる)。
+ * 大文字小文字は区別しない。`matchMode` 省略・未知の値は "Prefix" (前方一致、既定) として扱う
+ * (プロトコル準拠。準拠サーバーは Prefix/Contains/Exact の3種すべてを実装する)。
  */
 export function searchTrainsByNumber(
 	workGroups: WorkGroupData[],
 	trainNumber: string,
+	matchMode?: TrainSearchMatchMode | null,
 ): TrainSearchResultSummary[] {
 	const needle = trainNumber.trim();
 	if (needle === "") return [];
@@ -50,7 +77,8 @@ export function searchTrainsByNumber(
 	for (const wg of workGroups) {
 		for (const work of wg.Works) {
 			for (const train of work.Trains) {
-				if ((train.TrainNumber ?? "").trim().toLowerCase() !== needleLower) continue;
+				const candidate = (train.TrainNumber ?? "").trim();
+				if (!matchesTrainNumber(candidate, needleLower, matchMode)) continue;
 				const { startStationName, startTime, endStationName, endTime } = deriveStartEnd(train);
 				results.push({
 					WorkGroupId: wg.Id ?? null,

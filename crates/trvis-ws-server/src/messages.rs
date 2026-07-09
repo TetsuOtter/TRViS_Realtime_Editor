@@ -315,6 +315,25 @@ pub struct NotificationMessage {
 	/// エディタからの通常送信は新規通告なので `false`。
 	#[serde(rename = "Acknowledged")]
 	pub acknowledged: bool,
+	/// 初回表示を小型 (画面上部の1行バナー) で行うか。`false` (既定) は大型の中央
+	/// ポップアップ。`Acknowledged` と同様に常に serialize する (#254 フォローアップ仕様)。
+	#[serde(rename = "CompactDisplay")]
+	pub compact_display: bool,
+	/// この通告が対象とする区間・駅の開始側 (駅名または駅ID)。`section_end_station` と
+	/// 併せて区間を表す。`section_end_station` が無い場合は単駅指定とみなす。
+	#[serde(
+		rename = "SectionStartStation",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub section_start_station: Option<String>,
+	/// この通告が対象とする区間の終了側 (駅名または駅ID)。未指定時は
+	/// `section_start_station` と同一 (単駅) 扱い。
+	#[serde(rename = "SectionEndStation", skip_serializing_if = "Option::is_none")]
+	pub section_end_station: Option<String>,
+	/// 区間開始の何駅手前から (受領後の) 再表示を開始するか。TRViS 側の既定は 1。
+	/// `Priority` と同様に常に serialize する。
+	#[serde(rename = "StationsBefore")]
+	pub stations_before: i32,
 }
 
 /// `NotificationMessage::new` の引数まとめ。フィールド数が多いため位置引数ではなく
@@ -333,6 +352,10 @@ pub struct NotificationParams {
 	pub icon_color_rgb: Option<i32>,
 	pub icon_image_base64: Option<String>,
 	pub acknowledged: bool,
+	pub compact_display: bool,
+	pub section_start_station: Option<String>,
+	pub section_end_station: Option<String>,
+	pub stations_before: i32,
 }
 
 impl NotificationMessage {
@@ -351,6 +374,10 @@ impl NotificationMessage {
 			icon_color_rgb: p.icon_color_rgb,
 			icon_image_base64: p.icon_image_base64,
 			acknowledged: p.acknowledged,
+			compact_display: p.compact_display,
+			section_start_station: p.section_start_station,
+			section_end_station: p.section_end_station,
+			stations_before: p.stations_before,
 		}
 	}
 }

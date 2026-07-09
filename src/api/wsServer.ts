@@ -207,6 +207,14 @@ export async function broadcastNotification(args: {
 	iconImageBase64?: string | null;
 	/** サーバ再配信時に既読扱いにするケース用。通常送信は false (省略)。 */
 	acknowledged?: boolean | null;
+	/** true で初回表示を画面上部の小型バナーにする。未指定/false は大型の中央ポップアップ。 */
+	compactDisplay?: boolean | null;
+	/** 区間・駅連動の再表示: 開始側 (駅名または駅ID)。 */
+	sectionStartStation?: string | null;
+	/** 区間・駅連動の再表示: 終了側 (駅名または駅ID)。未指定時は開始側と同一 (単駅) 扱い。 */
+	sectionEndStation?: string | null;
+	/** 区間開始の何駅手前から再表示を開始するか。未指定時は 1。 */
+	stationsBefore?: number | null;
 }): Promise<void> {
 	const t = await loadTauri();
 	if (!t) return;
@@ -223,6 +231,10 @@ export async function broadcastNotification(args: {
 		iconColorRgb: args.iconColorRgb ?? null,
 		iconImageBase64: args.iconImageBase64 ?? null,
 		acknowledged: args.acknowledged ?? false,
+		compactDisplay: args.compactDisplay ?? false,
+		sectionStartStation: args.sectionStartStation ?? null,
+		sectionEndStation: args.sectionEndStation ?? null,
+		stationsBefore: args.stationsBefore ?? null,
 	});
 }
 

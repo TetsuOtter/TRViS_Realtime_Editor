@@ -9,7 +9,7 @@ import {
 	broadcastServerInfo,
 	broadcastTimeFormat,
 } from "../api/wsServer";
-import { useEditorStore } from "../store/editorStore";
+import { selectActiveTrain, useEditorStore } from "../store/editorStore";
 import type { OperationCommandAction } from "../types/trvis";
 
 const OPERATION_BUTTONS: { action: OperationCommandAction; label: string; danger?: boolean }[] = [
@@ -82,6 +82,11 @@ export function RemoteCommandsPanel() {
 	const [notifIconImageBase64, setNotifIconImageBase64] = useState("");
 	/** 空 = 送信時に現在時刻 (TZ付き/UTC) を自動設定。編集すると送信時そのまま使う。 */
 	const [notifIssuedAt, setNotifIssuedAt] = useState("");
+	const [notifAcknowledged, setNotifAcknowledged] = useState(false);
+	const [notifCompactDisplay, setNotifCompactDisplay] = useState(false);
+	const [notifSectionStartStation, setNotifSectionStartStation] = useState("");
+	const [notifSectionEndStation, setNotifSectionEndStation] = useState("");
+	const [notifStationsBefore, setNotifStationsBefore] = useState(1);
 	const [busy, setBusy] = useState(false);
 
 	const serverInfo = useEditorStore((s) => s.serverInfo);
@@ -89,6 +94,13 @@ export function RemoteCommandsPanel() {
 	const diagramInfo = useEditorStore((s) => s.diagramInfo);
 	const setDiagramInfo = useEditorStore((s) => s.setDiagramInfo);
 	const workGroups = useEditorStore((s) => s.workGroups);
+	const activeTrain = useEditorStore(selectActiveTrain);
+	/** 現在表示中の列車の駅一覧 (区間指定プルダウンの候補)。Id があれば駅ID、無ければ駅名を値にする。 */
+	const stationOptions =
+		activeTrain?.TimetableRows.map((r) => ({
+			value: r.Id || r.StationName,
+			label: r.Id ? `${r.StationName} (${r.Id})` : r.StationName,
+		})).filter((o) => o.value) ?? [];
 	const [wgIdsText, setWgIdsText] = useState(() => diagramInfo.WorkGroupIds.join(", "));
 
 	const commitWgIds = (text: string) => {
@@ -331,6 +343,91 @@ export function RemoteCommandsPanel() {
 								今(TZなし)
 							</button>
 						</div>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 6,
+								fontSize: 12,
+								cursor: "pointer",
+							}}
+							title="受領済みとして送信する (受領ボタンは表示されず、既読扱いになる)"
+						>
+							<input
+								type="checkbox"
+								checked={notifAcknowledged}
+								onChange={(e) => setNotifAcknowledged(e.target.checked)}
+							/>
+							受領済みとして送信 (Acknowledged)
+						</label>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 6,
+								fontSize: 12,
+								cursor: "pointer",
+							}}
+						>
+							<input
+								type="checkbox"
+								checked={notifCompactDisplay}
+								onChange={(e) => setNotifCompactDisplay(e.target.checked)}
+							/>
+							小型バナー表示 (CompactDisplay)
+						</label>
+						<div style={{ display: "flex", gap: 4 }}>
+							<input
+								type="text"
+								placeholder="区間開始駅 (駅名/駅ID)"
+								value={notifSectionStartStation}
+								onChange={(e) => setNotifSectionStartStation(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<input
+								type="text"
+								placeholder="区間終了駅 (省略=単駅)"
+								value={notifSectionEndStation}
+								onChange={(e) => setNotifSectionEndStation(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+						</div>
+						<div style={{ display: "flex", gap: 4 }}>
+							<select
+								value=""
+								onChange={(e) => {
+									if (e.target.value) setNotifSectionStartStation(e.target.value);
+									e.target.value = "";
+								}}
+								disabled={stationOptions.length === 0}
+								title="現在表示中の列車の駅から選択 (駅IDで指定される)"
+								style={{ ...textInputStyle, flex: 1 }}
+							>
+								<option value="">区間開始駅を選択...</option>
+								{stationOptions.map((o) => (
+									<option key={`start-${o.value}`} value={o.value}>
+										{o.label}
+									</option>
+								))}
+							</select>
+							<select
+								value=""
+								onChange={(e) => {
+									if (e.target.value) setNotifSectionEndStation(e.target.value);
+									e.target.value = "";
+								}}
+								disabled={stationOptions.length === 0}
+								title="現在表示中の列車の駅から選択 (駅IDで指定される)"
+								style={{ ...textInputStyle, flex: 1 }}
+							>
+								<option value="">区間終了駅を選択...</option>
+								{stationOptions.map((o) => (
+									<option key={`end-${o.value}`} value={o.value}>
+										{o.label}
+									</option>
+								))}
+							</select>
+						</div>
 						<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
 							<label style={{ ...labelStyle, fontWeight: 400 }}>
 								Priority:
@@ -340,6 +437,23 @@ export function RemoteCommandsPanel() {
 									onChange={(e) => setNotifPriority(Number(e.target.value) || 0)}
 									style={{
 										width: 56,
+										marginLeft: 4,
+										padding: "2px 4px",
+										border: "1px solid var(--border)",
+										borderRadius: 4,
+										background: "var(--bg)",
+										fontSize: 12,
+									}}
+								/>
+							</label>
+							<label style={{ ...labelStyle, fontWeight: 400 }} title="区間開始の何駅手前から再表示するか (既定1)">
+								StationsBefore:
+								<input
+									type="number"
+									value={notifStationsBefore}
+									onChange={(e) => setNotifStationsBefore(Number(e.target.value) || 0)}
+									style={{
+										width: 48,
 										marginLeft: 4,
 										padding: "2px 4px",
 										border: "1px solid var(--border)",
@@ -367,6 +481,11 @@ export function RemoteCommandsPanel() {
 													? (rgbStringToInt(notifIconColor) ?? null)
 													: null,
 												iconImageBase64: notifIconImageBase64 || null,
+												acknowledged: notifAcknowledged,
+												compactDisplay: notifCompactDisplay,
+												sectionStartStation: notifSectionStartStation.trim() || null,
+												sectionEndStation: notifSectionEndStation.trim() || null,
+												stationsBefore: notifStationsBefore,
 											}),
 										"Notification.send",
 									)

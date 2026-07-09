@@ -210,6 +210,25 @@ export interface ServerNotificationMessage {
 	 * エディタからの通常送信は新規通告なので false。
 	 */
 	Acknowledged: boolean;
+	/**
+	 * 初回表示を小型 (画面上部の1行バナー) で行うか。未指定/false は大型の中央
+	 * ポップアップ。小型でも受領ボタンは表示される。
+	 */
+	CompactDisplay: boolean;
+	/**
+	 * この通告が対象とする区間・駅の開始側 (駅名または駅ID)。`SectionEndStation` と
+	 * 併せて区間を表す。`SectionEndStation` が未指定の場合は単駅指定とみなす。
+	 * 受領後、この区間の `StationsBefore` 駅手前で受領済み状態の小型バナーとして
+	 * 自動的に再表示され、区間を抜けると自動的に非表示になる。
+	 */
+	SectionStartStation?: string | null;
+	/**
+	 * この通告が対象とする区間の終了側 (駅名または駅ID)。未指定時は
+	 * `SectionStartStation` と同一 (単駅) 扱い。
+	 */
+	SectionEndStation?: string | null;
+	/** 区間開始の何駅手前から再表示を開始するか。既定 1。 */
+	StationsBefore: number;
 }
 
 /** サーバ → クライアント: タイトルバー時刻表示フォーマット指定 */

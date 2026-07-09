@@ -737,6 +737,26 @@ mod tests {
 		assert!(!minimal.contains("IconText"));
 		assert!(!minimal.contains("IconColor_RGB"));
 		assert!(!minimal.contains("IconImageBase64"));
+		// CompactDisplay/StationsBefore は Priority/Acknowledged と同様に常に出力される。
+		assert!(minimal.contains(r#""CompactDisplay":false"#));
+		assert!(minimal.contains(r#""StationsBefore":0"#));
+		assert!(!minimal.contains("SectionStartStation"));
+		assert!(!minimal.contains("SectionEndStation"));
+
+		// CompactDisplay/SectionStartStation/SectionEndStation/StationsBefore (#254 followup)。
+		let s = serde_json::to_string(&NotificationMessage::new(NotificationParams {
+			title: Some("区間通告".into()),
+			compact_display: true,
+			section_start_station: Some("石川".into()),
+			section_end_station: Some("川部".into()),
+			stations_before: 2,
+			..Default::default()
+		}))
+		.unwrap();
+		assert!(s.contains(r#""CompactDisplay":true"#));
+		assert!(s.contains(r#""SectionStartStation":"石川""#));
+		assert!(s.contains(r#""SectionEndStation":"川部""#));
+		assert!(s.contains(r#""StationsBefore":2"#));
 
 		let s = serde_json::to_string(&TimeFormatMessage::new(Some("HH:mm".into()))).unwrap();
 		assert!(s.contains(r#""Format":"HH:mm""#));

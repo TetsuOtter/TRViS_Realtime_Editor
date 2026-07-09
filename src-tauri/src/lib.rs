@@ -228,6 +228,10 @@ async fn broadcast_notification(
 	icon_color_rgb: Option<i32>,
 	icon_image_base64: Option<String>,
 	acknowledged: Option<bool>,
+	compact_display: Option<bool>,
+	section_start_station: Option<String>,
+	section_end_station: Option<String>,
+	stations_before: Option<i32>,
 ) -> Result<(), String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
@@ -244,6 +248,10 @@ async fn broadcast_notification(
 		icon_color_rgb,
 		icon_image_base64,
 		acknowledged: acknowledged.unwrap_or(false),
+		compact_display: compact_display.unwrap_or(false),
+		section_start_station,
+		section_end_station,
+		stations_before: stations_before.unwrap_or(1),
 	});
 	handle
 		.state

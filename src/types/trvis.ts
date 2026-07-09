@@ -129,6 +129,11 @@ export interface ServerInfoMessage {
 	Admin?: string | null;
 	Version?: string | null;
 	ProtocolVersion?: string | null;
+	/**
+	 * 拡張機能ネゴシエーション (v1.1)。既知の機能 ID は `"TrainSearch"`。
+	 * 省略/null は「拡張機能なし」を意味する。
+	 */
+	Features?: string[] | null;
 }
 
 /**
@@ -188,6 +193,41 @@ export interface ServerTimeFormatMessage {
 	Format?: string | null;
 }
 
+/**
+ * `SearchTrain.MatchMode` (v1.1 列番検索、一致方式)。
+ * 前方一致 (既定) / 中間一致 / 完全一致。数字部分 (列車番号) のみが対象。
+ */
+export type TrainSearchMatchMode = "Prefix" | "Contains" | "Exact";
+
+/**
+ * `SearchTrain` の候補 1 件のサマリ (v1.1)。完全な時刻表は含まず、
+ * 確定時に `RequestTrainTimetable` で別途取得する (2段階フロー)。
+ */
+export interface TrainSearchResultSummary {
+	WorkGroupId?: string | null;
+	WorkId?: string | null;
+	TrainId?: string | null;
+	TrainNumber?: string | null;
+	WorkName?: string | null;
+	/** -1 = Inbound / 1 = Outbound */
+	Direction?: number | null;
+	StartStationName?: string | null;
+	StartTime?: string | null;
+	EndStationName?: string | null;
+	EndTime?: string | null;
+}
+
+/**
+ * サーバ → クライアント: `SearchTrain` への応答 (v1.1)。
+ * `RequestId` はクライアントが送った `SearchTrain.RequestId` を echo する。
+ * `Results` は該当0件でも必ず送る (空配列 = 「該当なし」、無応答 = タイムアウトと区別するため)。
+ */
+export interface ServerSearchTrainResponseMessage {
+	MessageType: "SearchTrainResponse";
+	RequestId: string;
+	Results: TrainSearchResultSummary[];
+}
+
 export type ServerMessage =
 	| ServerSyncedDataMessage
 	| ServerTimetableMessage
@@ -197,7 +237,8 @@ export type ServerMessage =
 	| ServerOperationCommandMessage
 	| ServerHeaderColorMessage
 	| ServerNotificationMessage
-	| ServerTimeFormatMessage;
+	| ServerTimeFormatMessage
+	| ServerSearchTrainResponseMessage;
 
 /* -------------------------------------------------------------------------- */
 /*  Editor-internal types                                                     */
@@ -230,8 +271,14 @@ export interface EditorServerInfo {
 	Name: string;
 	Admin: string;
 	Version: string;
-	/** TRViS NetworkSyncService 現行プロトコルは "1.0"。 */
+	/** TRViS NetworkSyncService 現行プロトコルは "1.1" (v1.1 で列車検索機能を追加)。 */
 	ProtocolVersion: string;
+	/**
+	 * 列番検索機能 (`SearchTrain`/`RequestTrainTimetable`, v1.1) を広告 (`Features: ["TrainSearch"]`)
+	 * し、要求に応答するかどうか。false の場合は `Features` を送らず、要求にも応答しない
+	 * (クライアントはタイムアウトする)。
+	 */
+	TrainSearchEnabled: boolean;
 }
 
 /**
@@ -275,4 +322,20 @@ export type WsServerEvent =
 	| { type: "id-update"; clientId: string; message: ClientIdUpdateMessage }
 	| { type: "request-server-info"; clientId: string }
 	| { type: "request-diagram-info"; clientId: string; diagramId: string | null }
+	| {
+			type: "search-train";
+			clientId: string;
+			requestId: string | null;
+			trainNumber: string | null;
+			/** 省略時・未知の値は "Prefix" (前方一致) として扱う。 */
+			matchMode: string | null;
+	  }
+	| {
+			type: "request-train-timetable";
+			clientId: string;
+			requestId: string | null;
+			workGroupId: string | null;
+			workId: string | null;
+			trainId: string | null;
+	  }
 	| { type: "error"; message: string };

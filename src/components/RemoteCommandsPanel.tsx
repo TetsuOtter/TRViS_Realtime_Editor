@@ -310,6 +310,22 @@ export function RemoteCommandsPanel() {
 								style={textInputStyle}
 							/>
 						</div>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 6,
+								fontSize: 12,
+								cursor: "pointer",
+							}}
+						>
+							<input
+								type="checkbox"
+								checked={serverInfo.TrainSearchEnabled}
+								onChange={(e) => setServerInfo({ TrainSearchEnabled: e.target.checked })}
+							/>
+							列車検索 (TrainSearch) に対応する
+						</label>
 						<button
 							onClick={() =>
 								guard(
@@ -319,6 +335,7 @@ export function RemoteCommandsPanel() {
 											admin: serverInfo.Admin.trim() || null,
 											version: serverInfo.Version.trim() || null,
 											protocolVersion: serverInfo.ProtocolVersion.trim() || null,
+											features: serverInfo.TrainSearchEnabled ? ["TrainSearch"] : null,
 										}),
 									"ServerInfo.broadcast",
 								)

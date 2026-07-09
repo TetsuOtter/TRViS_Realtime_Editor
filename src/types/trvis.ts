@@ -183,12 +183,27 @@ export interface ServerHeaderColorMessage {
 export interface ServerNotificationMessage {
 	MessageType: "Notification";
 	Id?: string | null;
+	/** 指令番号。表示のみに用いられる (サーバ・現場運用側の管理番号)。 */
+	OrderNumber?: string | null;
 	Title?: string | null;
 	Body?: string | null;
 	/** 0=通常, 1=重要 など (サーバ任意) */
 	Priority: number;
-	/** ISO8601 文字列 */
+	/**
+	 * ISO8601 文字列。TZ オフセット (`Z`/`+HH:mm`/`-HH:mm`) の有無で TRViS 側の表示が変わる:
+	 * オフセット有りは端末 TZ に変換して表示、無しはそのまま表示する。
+	 */
 	IssuedAt?: string | null;
+	/** 受信者。表示のみに用いられる。 */
+	Receiver?: string | null;
+	/** 指令者 (発信者)。表示のみに用いられる。 */
+	Sender?: string | null;
+	/** アイコン文字 (1〜2文字程度)。IconImageBase64 指定時は無視される。 */
+	IconText?: string | null;
+	/** IconText の背景色 (0xRRGGBB の整数)。未指定時は既定色。 */
+	IconColor_RGB?: number | null;
+	/** アイコン画像の Base64 (data URI プレフィックス可)。指定時は IconText/IconColor_RGB より優先。 */
+	IconImageBase64?: string | null;
 	/**
 	 * サーバがこのクライアントについて当該通告を「受領済み」と判断しているか。
 	 * true のときクライアントは既読扱いとし再ポップアップしない (再配信時想定)。

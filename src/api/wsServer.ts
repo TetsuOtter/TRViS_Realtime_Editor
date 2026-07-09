@@ -188,11 +188,23 @@ export async function broadcastHeaderColor(args: {
  */
 export async function broadcastNotification(args: {
 	id?: string | null;
+	/** 指令番号。表示のみに用いられる。 */
+	orderNumber?: string | null;
 	title?: string | null;
 	body?: string | null;
 	priority?: number | null;
 	/** ISO8601 文字列 */
 	issuedAt?: string | null;
+	/** 受信者。表示のみに用いられる。 */
+	receiver?: string | null;
+	/** 指令者 (発信者)。表示のみに用いられる。 */
+	sender?: string | null;
+	/** アイコン文字 (1〜2文字程度)。iconImageBase64 指定時は無視される。 */
+	iconText?: string | null;
+	/** iconText の背景色 (0xRRGGBB の整数)。未指定時は既定色。 */
+	iconColorRgb?: number | null;
+	/** アイコン画像の Base64 (data URI プレフィックス可)。指定時は iconText/iconColorRgb より優先。 */
+	iconImageBase64?: string | null;
 	/** サーバ再配信時に既読扱いにするケース用。通常送信は false (省略)。 */
 	acknowledged?: boolean | null;
 }): Promise<void> {
@@ -200,10 +212,16 @@ export async function broadcastNotification(args: {
 	if (!t) return;
 	await t.invoke<void>("broadcast_notification", {
 		id: args.id ?? null,
+		orderNumber: args.orderNumber ?? null,
 		title: args.title ?? null,
 		body: args.body ?? null,
 		priority: args.priority ?? null,
 		issuedAt: args.issuedAt ?? null,
+		receiver: args.receiver ?? null,
+		sender: args.sender ?? null,
+		iconText: args.iconText ?? null,
+		iconColorRgb: args.iconColorRgb ?? null,
+		iconImageBase64: args.iconImageBase64 ?? null,
 		acknowledged: args.acknowledged ?? false,
 	});
 }

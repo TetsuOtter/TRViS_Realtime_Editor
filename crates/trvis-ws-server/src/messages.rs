@@ -271,21 +271,44 @@ impl HeaderColorMessage {
 }
 
 /// サーバ → クライアント: 通告 (任意のお知らせ) 配信。
-/// `issued_at` は RFC3339 (ISO8601) 文字列。
+/// `issued_at` は RFC3339 (ISO8601) 文字列。TZ オフセットの有無で TRViS 側の表示
+/// (端末 TZ に変換 / そのまま表示) が変わるが、それは文字列自体から判定されるため
+/// このメッセージ側に別フィールドは無い (PR #301 のフォローアップ仕様)。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NotificationMessage {
 	#[serde(rename = "MessageType")]
 	pub message_type: String,
 	#[serde(rename = "Id", skip_serializing_if = "Option::is_none")]
 	pub id: Option<String>,
+	/// 指令番号。サーバ・現場運用側の管理番号で、表示のみに用いられる。
+	#[serde(rename = "OrderNumber", skip_serializing_if = "Option::is_none")]
+	pub order_number: Option<String>,
 	#[serde(rename = "Title", skip_serializing_if = "Option::is_none")]
 	pub title: Option<String>,
 	#[serde(rename = "Body", skip_serializing_if = "Option::is_none")]
 	pub body: Option<String>,
+	/// 0=通常, 1=重要 等。サーバ任意。
 	#[serde(rename = "Priority")]
 	pub priority: i32,
 	#[serde(rename = "IssuedAt", skip_serializing_if = "Option::is_none")]
 	pub issued_at: Option<String>,
+	/// 受信者。表示のみに用いられる。
+	#[serde(rename = "Receiver", skip_serializing_if = "Option::is_none")]
+	pub receiver: Option<String>,
+	/// 指令者 (発信者)。表示のみに用いられる。
+	#[serde(rename = "Sender", skip_serializing_if = "Option::is_none")]
+	pub sender: Option<String>,
+	/// アイコンとして表示する文字 (1〜2文字程度を想定)。`icon_image_base64` が
+	/// 指定されている場合はそちらが優先され、この文字は使用されない。
+	#[serde(rename = "IconText", skip_serializing_if = "Option::is_none")]
+	pub icon_text: Option<String>,
+	/// `icon_text` の背景色 (0xRRGGBB)。未指定時は TRViS 側の既定色が使われる。
+	#[serde(rename = "IconColor_RGB", skip_serializing_if = "Option::is_none")]
+	pub icon_color_rgb: Option<i32>,
+	/// アイコン画像の Base64 エンコードされたバイナリ (data URI プレフィックスを含んでいてもよい)。
+	/// 指定されている場合、`icon_text`/`icon_color_rgb` より優先して表示される。
+	#[serde(rename = "IconImageBase64", skip_serializing_if = "Option::is_none")]
+	pub icon_image_base64: Option<String>,
 	/// クライアントが当該通告を「受領済み」と判断してよいか (TRViS.JsonModels
 	/// `NotificationData.Acknowledged` 準拠)。`Priority` と同様に常に serialize する
 	/// (リファレンスサーバも常に出力し、TRViS 側は欠落を false 扱いする)。
@@ -294,23 +317,40 @@ pub struct NotificationMessage {
 	pub acknowledged: bool,
 }
 
+/// `NotificationMessage::new` の引数まとめ。フィールド数が多いため位置引数ではなく
+/// 構造体で渡す。
+#[derive(Debug, Clone, Default)]
+pub struct NotificationParams {
+	pub id: Option<String>,
+	pub order_number: Option<String>,
+	pub title: Option<String>,
+	pub body: Option<String>,
+	pub priority: i32,
+	pub issued_at: Option<String>,
+	pub receiver: Option<String>,
+	pub sender: Option<String>,
+	pub icon_text: Option<String>,
+	pub icon_color_rgb: Option<i32>,
+	pub icon_image_base64: Option<String>,
+	pub acknowledged: bool,
+}
+
 impl NotificationMessage {
-	pub fn new(
-		id: Option<String>,
-		title: Option<String>,
-		body: Option<String>,
-		priority: i32,
-		issued_at: Option<String>,
-		acknowledged: bool,
-	) -> Self {
+	pub fn new(p: NotificationParams) -> Self {
 		Self {
 			message_type: "Notification".into(),
-			id,
-			title,
-			body,
-			priority,
-			issued_at,
-			acknowledged,
+			id: p.id,
+			order_number: p.order_number,
+			title: p.title,
+			body: p.body,
+			priority: p.priority,
+			issued_at: p.issued_at,
+			receiver: p.receiver,
+			sender: p.sender,
+			icon_text: p.icon_text,
+			icon_color_rgb: p.icon_color_rgb,
+			icon_image_base64: p.icon_image_base64,
+			acknowledged: p.acknowledged,
 		}
 	}
 }

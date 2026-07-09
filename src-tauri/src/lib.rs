@@ -8,9 +8,9 @@ use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use trvis_ws_server::{
 	start, CachedSyncedData, DiagramInfoMessage, HeaderColorMessage, MonitorDirection, MonitorFrame,
-	NotificationMessage, OperationCommandMessage, OutboundMessage, SearchTrainResponseMessage,
-	SelectTrainMessage, ServerEvent, ServerHandle, ServerInfoMessage, ServerOptions,
-	ServerTimetableMessage, TimeFormatMessage, TrainSearchResultItem,
+	NotificationMessage, NotificationParams, OperationCommandMessage, OutboundMessage,
+	SearchTrainResponseMessage, SelectTrainMessage, ServerEvent, ServerHandle, ServerInfoMessage,
+	ServerOptions, ServerTimetableMessage, TimeFormatMessage, TrainSearchResultItem,
 };
 
 #[derive(Default)]
@@ -213,25 +213,38 @@ async fn broadcast_header_color(
 
 /// 全クライアントへ `Notification` を送る。
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn broadcast_notification(
 	state: State<'_, AppState>,
 	id: Option<String>,
+	order_number: Option<String>,
 	title: Option<String>,
 	body: Option<String>,
 	priority: Option<i32>,
 	issued_at: Option<String>,
+	receiver: Option<String>,
+	sender: Option<String>,
+	icon_text: Option<String>,
+	icon_color_rgb: Option<i32>,
+	icon_image_base64: Option<String>,
 	acknowledged: Option<bool>,
 ) -> Result<(), String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
-	let msg = NotificationMessage::new(
+	let msg = NotificationMessage::new(NotificationParams {
 		id,
+		order_number,
 		title,
 		body,
-		priority.unwrap_or(0),
+		priority: priority.unwrap_or(0),
 		issued_at,
-		acknowledged.unwrap_or(false),
-	);
+		receiver,
+		sender,
+		icon_text,
+		icon_color_rgb,
+		icon_image_base64,
+		acknowledged: acknowledged.unwrap_or(false),
+	});
 	handle
 		.state
 		.broadcast(OutboundMessage::Notification(msg))

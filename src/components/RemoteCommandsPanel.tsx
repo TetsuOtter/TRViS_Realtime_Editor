@@ -61,13 +61,27 @@ function intToRgbString(rgb: number): string {
 	return "#" + rgb.toString(16).padStart(6, "0");
 }
 
+/** TZ オフセット無しの ISO 8601 風文字列 (端末の現在時刻をそのまま表示させたい場合用)。 */
+function localIsoStringNoOffset(d: Date): string {
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 export function RemoteCommandsPanel() {
 	const [open, setOpen] = useState(false);
 	const [headerColor, setHeaderColor] = useState("#336699");
 	const [notifId, setNotifId] = useState("");
+	const [notifOrderNumber, setNotifOrderNumber] = useState("");
 	const [notifTitle, setNotifTitle] = useState("");
 	const [notifBody, setNotifBody] = useState("");
 	const [notifPriority, setNotifPriority] = useState(0);
+	const [notifReceiver, setNotifReceiver] = useState("");
+	const [notifSender, setNotifSender] = useState("");
+	const [notifIconText, setNotifIconText] = useState("");
+	const [notifIconColor, setNotifIconColor] = useState("#C62828");
+	const [notifIconImageBase64, setNotifIconImageBase64] = useState("");
+	/** 空 = 送信時に現在時刻 (TZ付き/UTC) を自動設定。編集すると送信時そのまま使う。 */
+	const [notifIssuedAt, setNotifIssuedAt] = useState("");
 	const [busy, setBusy] = useState(false);
 
 	const serverInfo = useEditorStore((s) => s.serverInfo);
@@ -228,6 +242,13 @@ export function RemoteCommandsPanel() {
 						</div>
 						<input
 							type="text"
+							placeholder="指令番号 (表示のみ)"
+							value={notifOrderNumber}
+							onChange={(e) => setNotifOrderNumber(e.target.value)}
+							style={textInputStyle}
+						/>
+						<input
+							type="text"
 							placeholder="タイトル"
 							value={notifTitle}
 							onChange={(e) => setNotifTitle(e.target.value)}
@@ -253,6 +274,63 @@ export function RemoteCommandsPanel() {
 								resize: "vertical",
 							}}
 						/>
+						<div style={{ display: "flex", gap: 4 }}>
+							<input
+								type="text"
+								placeholder="受信者"
+								value={notifReceiver}
+								onChange={(e) => setNotifReceiver(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<input
+								type="text"
+								placeholder="指令者"
+								value={notifSender}
+								onChange={(e) => setNotifSender(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+						</div>
+						<div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+							<input
+								type="text"
+								placeholder="アイコン文字 (1〜2文字)"
+								value={notifIconText}
+								onChange={(e) => setNotifIconText(e.target.value)}
+								maxLength={2}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<input
+								type="color"
+								value={/^#[0-9a-fA-F]{6}$/.test(notifIconColor) ? notifIconColor : "#C62828"}
+								onChange={(e) => setNotifIconColor(e.target.value)}
+								title="アイコン背景色"
+								style={{ width: 32, height: 24, padding: 0, border: "1px solid var(--border)" }}
+							/>
+						</div>
+						<input
+							type="text"
+							placeholder="アイコン画像 Base64 (data URI 可。指定時は文字/色より優先)"
+							value={notifIconImageBase64}
+							onChange={(e) => setNotifIconImageBase64(e.target.value)}
+							style={textInputStyle}
+						/>
+						<div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+							<input
+								type="text"
+								placeholder="発信日時 (空=送信時のUTC現在時刻)"
+								value={notifIssuedAt}
+								onChange={(e) => setNotifIssuedAt(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<button
+								type="button"
+								onClick={() => setNotifIssuedAt(localIsoStringNoOffset(new Date()))}
+								style={buttonStyle}
+								title="端末の現在時刻を TZ オフセット無しでセット (TRViS側でそのまま表示される)"
+							>
+								今(TZなし)
+							</button>
+						</div>
 						<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
 							<label style={{ ...labelStyle, fontWeight: 400 }}>
 								Priority:
@@ -277,10 +355,18 @@ export function RemoteCommandsPanel() {
 										() =>
 											broadcastNotification({
 												id: notifId.trim() || null,
+												orderNumber: notifOrderNumber || null,
 												title: notifTitle || null,
 												body: notifBody || null,
 												priority: notifPriority,
-												issuedAt: new Date().toISOString(),
+												issuedAt: notifIssuedAt.trim() || new Date().toISOString(),
+												receiver: notifReceiver || null,
+												sender: notifSender || null,
+												iconText: notifIconText || null,
+												iconColorRgb: notifIconText
+													? (rgbStringToInt(notifIconColor) ?? null)
+													: null,
+												iconImageBase64: notifIconImageBase64 || null,
 											}),
 										"Notification.send",
 									)

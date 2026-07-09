@@ -619,9 +619,9 @@ mod tests {
 	#[tokio::test]
 	async fn server_serializes_remote_command_messages() {
 		use crate::messages::{
-			DiagramInfoMessage, HeaderColorMessage, NotificationMessage, OperationCommandMessage,
-			SearchTrainResponseMessage, SelectTrainMessage, ServerInfoMessage, TimeFormatMessage,
-			TrainSearchResultItem,
+			DiagramInfoMessage, HeaderColorMessage, NotificationMessage, NotificationParams,
+			OperationCommandMessage, SearchTrainResponseMessage, SelectTrainMessage, ServerInfoMessage,
+			TimeFormatMessage, TrainSearchResultItem,
 		};
 		// 主要な outbound 型が期待した JSON フィールドを出力することを最小チェック。
 		let s = serde_json::to_string(&ServerInfoMessage::new(
@@ -683,31 +683,60 @@ mod tests {
 		assert!(reset.contains(r#""ResetToDefault":true"#));
 		assert!(!reset.contains("Color_RGB"));
 
-		let s = serde_json::to_string(&NotificationMessage::new(
-			Some("n1".into()),
-			Some("お知らせ".into()),
-			Some("本文".into()),
-			1,
-			Some("2026-05-09T01:00:00+09:00".into()),
-			false,
-		))
+		let s = serde_json::to_string(&NotificationMessage::new(NotificationParams {
+			id: Some("n1".into()),
+			title: Some("お知らせ".into()),
+			body: Some("本文".into()),
+			priority: 1,
+			issued_at: Some("2026-05-09T01:00:00+09:00".into()),
+			..Default::default()
+		}))
 		.unwrap();
 		assert!(s.contains(r#""Priority":1"#));
 		assert!(s.contains(r#""Id":"n1""#));
 		assert!(s.contains(r#""Acknowledged":false"#));
 
 		// Acknowledged=true (サーバ再配信で既読扱いにするケース) も serialize される。
-		let acked = serde_json::to_string(&NotificationMessage::new(
-			None,
-			Some("既読通告".into()),
-			None,
-			0,
-			None,
-			true,
-		))
+		let acked = serde_json::to_string(&NotificationMessage::new(NotificationParams {
+			title: Some("既読通告".into()),
+			acknowledged: true,
+			..Default::default()
+		}))
 		.unwrap();
 		assert!(acked.contains(r#""Acknowledged":true"#));
 		assert!(!acked.contains("IssuedAt"));
+
+		// OrderNumber/Receiver/Sender/IconText/IconColor_RGB/IconImageBase64 (PR #301 followup)。
+		let s = serde_json::to_string(&NotificationMessage::new(NotificationParams {
+			order_number: Some("指令3号".into()),
+			title: Some("徐行運転".into()),
+			receiver: Some("XX列車乗務員".into()),
+			sender: Some("指令所".into()),
+			icon_text: Some("D".into()),
+			icon_color_rgb: Some(0xC62828),
+			icon_image_base64: Some("data:image/png;base64,AAAA".into()),
+			..Default::default()
+		}))
+		.unwrap();
+		assert!(s.contains(r#""OrderNumber":"指令3号""#));
+		assert!(s.contains(r#""Receiver":"XX列車乗務員""#));
+		assert!(s.contains(r#""Sender":"指令所""#));
+		assert!(s.contains(r#""IconText":"D""#));
+		assert!(s.contains(r#""IconColor_RGB":12986408"#));
+		assert!(s.contains(r#""IconImageBase64":"data:image/png;base64,AAAA""#));
+
+		// 全省略時は新フィールドが出力されない。
+		let minimal = serde_json::to_string(&NotificationMessage::new(NotificationParams {
+			title: Some("最小".into()),
+			..Default::default()
+		}))
+		.unwrap();
+		assert!(!minimal.contains("OrderNumber"));
+		assert!(!minimal.contains("Receiver"));
+		assert!(!minimal.contains("Sender"));
+		assert!(!minimal.contains("IconText"));
+		assert!(!minimal.contains("IconColor_RGB"));
+		assert!(!minimal.contains("IconImageBase64"));
 
 		let s = serde_json::to_string(&TimeFormatMessage::new(Some("HH:mm".into()))).unwrap();
 		assert!(s.contains(r#""Format":"HH:mm""#));

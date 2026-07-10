@@ -43,7 +43,7 @@
 		"@types/json-schema": "^7.0.15",
 		"codemirror": "^6.0.2",
 		"codemirror-json-schema": "^0.8.1",
-		"immer": "11.1.9",
+		"immer": "11.1.11",
 		"json-schema-library": "^11.6.1",
 		"jsonc-parser": "^3.3.1",
 		"maplibre-gl": "^5.24.0",
@@ -85,7 +85,7 @@
 			"@codemirror/lint": "6.9.7",
 			"zustand": "5.0.14",
 			"@tauri-apps/cli": "2.11.4",
-			"immer": "11.1.9",
+			"immer": "11.1.11",
 			"vite": "8.1.3"
 		}
 	}

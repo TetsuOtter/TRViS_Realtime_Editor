@@ -73,6 +73,7 @@ export function RemoteCommandsPanel() {
 	const [notifId, setNotifId] = useState("");
 	const [notifOrderNumber, setNotifOrderNumber] = useState("");
 	const [notifTitle, setNotifTitle] = useState("");
+	const [notifSummary, setNotifSummary] = useState("");
 	const [notifBody, setNotifBody] = useState("");
 	const [notifPriority, setNotifPriority] = useState(0);
 	const [notifReceiver, setNotifReceiver] = useState("");
@@ -270,6 +271,20 @@ export function RemoteCommandsPanel() {
 								borderRadius: 4,
 								background: "var(--bg)",
 								fontSize: 12,
+							}}
+						/>
+						<textarea
+							placeholder="要約 (小型バナー表示用。空欄=タイトル)"
+							value={notifSummary}
+							onChange={(e) => setNotifSummary(e.target.value)}
+							style={{
+								padding: "3px 6px",
+								border: "1px solid var(--border)",
+								borderRadius: 4,
+								background: "var(--bg)",
+								fontSize: 12,
+								minHeight: 32,
+								resize: "vertical",
 							}}
 						/>
 						<textarea
@@ -471,6 +486,7 @@ export function RemoteCommandsPanel() {
 												id: notifId.trim() || null,
 												orderNumber: notifOrderNumber || null,
 												title: notifTitle || null,
+												summary: notifSummary || null,
 												body: notifBody || null,
 												priority: notifPriority,
 												issuedAt: notifIssuedAt.trim() || new Date().toISOString(),
@@ -490,11 +506,11 @@ export function RemoteCommandsPanel() {
 										"Notification.send",
 									)
 								}
-								disabled={!notifTitle && !notifBody}
-								style={{
-									...buttonStyle,
-									color: !notifTitle && !notifBody ? "var(--text-muted)" : "var(--text)",
-									cursor: !notifTitle && !notifBody ? "not-allowed" : "pointer",
+							disabled={!notifTitle && !notifSummary && !notifBody}
+							style={{
+								...buttonStyle,
+								color: !notifTitle && !notifSummary && !notifBody ? "var(--text-muted)" : "var(--text)",
+								cursor: !notifTitle && !notifSummary && !notifBody ? "not-allowed" : "pointer",
 								}}
 							>
 								送信

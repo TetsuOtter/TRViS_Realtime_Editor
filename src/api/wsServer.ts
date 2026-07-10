@@ -191,6 +191,8 @@ export async function broadcastNotification(args: {
 	/** 指令番号。表示のみに用いられる。 */
 	orderNumber?: string | null;
 	title?: string | null;
+	/** 小型バナー表示用の要約。未指定時は TRViS 側でタイトルにフォールバックする。 */
+	summary?: string | null;
 	body?: string | null;
 	priority?: number | null;
 	/** ISO8601 文字列 */
@@ -222,6 +224,7 @@ export async function broadcastNotification(args: {
 		id: args.id ?? null,
 		orderNumber: args.orderNumber ?? null,
 		title: args.title ?? null,
+		summary: args.summary ?? null,
 		body: args.body ?? null,
 		priority: args.priority ?? null,
 		issuedAt: args.issuedAt ?? null,

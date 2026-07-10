@@ -710,6 +710,7 @@ mod tests {
 		let s = serde_json::to_string(&NotificationMessage::new(NotificationParams {
 			order_number: Some("指令3号".into()),
 			title: Some("徐行運転".into()),
+			summary: Some("小型バナー用要約".into()),
 			receiver: Some("XX列車乗務員".into()),
 			sender: Some("指令所".into()),
 			icon_text: Some("D".into()),
@@ -719,6 +720,7 @@ mod tests {
 		}))
 		.unwrap();
 		assert!(s.contains(r#""OrderNumber":"指令3号""#));
+		assert!(s.contains(r#""Summary":"小型バナー用要約""#));
 		assert!(s.contains(r#""Receiver":"XX列車乗務員""#));
 		assert!(s.contains(r#""Sender":"指令所""#));
 		assert!(s.contains(r#""IconText":"D""#));
@@ -732,6 +734,7 @@ mod tests {
 		}))
 		.unwrap();
 		assert!(!minimal.contains("OrderNumber"));
+		assert!(!minimal.contains("Summary"));
 		assert!(!minimal.contains("Receiver"));
 		assert!(!minimal.contains("Sender"));
 		assert!(!minimal.contains("IconText"));

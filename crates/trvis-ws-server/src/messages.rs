@@ -285,6 +285,9 @@ pub struct NotificationMessage {
 	pub order_number: Option<String>,
 	#[serde(rename = "Title", skip_serializing_if = "Option::is_none")]
 	pub title: Option<String>,
+	/// 小型バナー表示用の要約。未指定時は TRViS 側で `Title` にフォールバックする。
+	#[serde(rename = "Summary", skip_serializing_if = "Option::is_none")]
+	pub summary: Option<String>,
 	#[serde(rename = "Body", skip_serializing_if = "Option::is_none")]
 	pub body: Option<String>,
 	/// 0=通常, 1=重要 等。サーバ任意。
@@ -343,6 +346,7 @@ pub struct NotificationParams {
 	pub id: Option<String>,
 	pub order_number: Option<String>,
 	pub title: Option<String>,
+	pub summary: Option<String>,
 	pub body: Option<String>,
 	pub priority: i32,
 	pub issued_at: Option<String>,
@@ -365,6 +369,7 @@ impl NotificationMessage {
 			id: p.id,
 			order_number: p.order_number,
 			title: p.title,
+			summary: p.summary,
 			body: p.body,
 			priority: p.priority,
 			issued_at: p.issued_at,

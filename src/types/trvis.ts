@@ -186,6 +186,8 @@ export interface ServerNotificationMessage {
 	/** 指令番号。表示のみに用いられる (サーバ・現場運用側の管理番号)。 */
 	OrderNumber?: string | null;
 	Title?: string | null;
+	/** 小型バナー表示用の要約。未指定時は Title にフォールバックする。 */
+	Summary?: string | null;
 	Body?: string | null;
 	/** 0=通常, 1=重要 など (サーバ任意) */
 	Priority: number;

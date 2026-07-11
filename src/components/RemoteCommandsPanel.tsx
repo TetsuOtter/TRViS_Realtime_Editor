@@ -461,7 +461,10 @@ export function RemoteCommandsPanel() {
 									}}
 								/>
 							</label>
-							<label style={{ ...labelStyle, fontWeight: 400 }} title="区間開始の何駅手前から再表示するか (既定1)">
+							<label
+								style={{ ...labelStyle, fontWeight: 400 }}
+								title="区間開始の何駅手前から再表示するか (既定1)"
+							>
 								StationsBefore:
 								<input
 									type="number"
@@ -506,11 +509,14 @@ export function RemoteCommandsPanel() {
 										"Notification.send",
 									)
 								}
-							disabled={!notifTitle && !notifSummary && !notifBody}
-							style={{
-								...buttonStyle,
-								color: !notifTitle && !notifSummary && !notifBody ? "var(--text-muted)" : "var(--text)",
-								cursor: !notifTitle && !notifSummary && !notifBody ? "not-allowed" : "pointer",
+								disabled={!notifTitle && !notifSummary && !notifBody}
+								style={{
+									...buttonStyle,
+									color:
+										!notifTitle && !notifSummary && !notifBody
+											? "var(--text-muted)"
+											: "var(--text)",
+									cursor: !notifTitle && !notifSummary && !notifBody ? "not-allowed" : "pointer",
 								}}
 							>
 								送信

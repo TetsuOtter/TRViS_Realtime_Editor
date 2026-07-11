@@ -181,23 +181,63 @@ export async function broadcastHeaderColor(args: {
 	});
 }
 
-/** 通告 (任意のお知らせ) を送る。 */
+/**
+ * 通告 (任意のお知らせ) を送る。
+ * `id` を指定すると TRViS 側で「受領可能」な通告になり、受領時に
+ * `AcknowledgeNotification` が送り返される。省略時は情報通知 (閉じるだけ)。
+ */
 export async function broadcastNotification(args: {
 	id?: string | null;
+	/** 指令番号。表示のみに用いられる。 */
+	orderNumber?: string | null;
 	title?: string | null;
+	/** 小型バナー表示用の要約。未指定時は TRViS 側でタイトルにフォールバックする。 */
+	summary?: string | null;
 	body?: string | null;
 	priority?: number | null;
 	/** ISO8601 文字列 */
 	issuedAt?: string | null;
+	/** 受信者。表示のみに用いられる。 */
+	receiver?: string | null;
+	/** 指令者 (発信者)。表示のみに用いられる。 */
+	sender?: string | null;
+	/** アイコン文字 (1〜2文字程度)。iconImageBase64 指定時は無視される。 */
+	iconText?: string | null;
+	/** iconText の背景色 (0xRRGGBB の整数)。未指定時は既定色。 */
+	iconColorRgb?: number | null;
+	/** アイコン画像の Base64 (data URI プレフィックス可)。指定時は iconText/iconColorRgb より優先。 */
+	iconImageBase64?: string | null;
+	/** サーバ再配信時に既読扱いにするケース用。通常送信は false (省略)。 */
+	acknowledged?: boolean | null;
+	/** true で初回表示を画面上部の小型バナーにする。未指定/false は大型の中央ポップアップ。 */
+	compactDisplay?: boolean | null;
+	/** 区間・駅連動の再表示: 開始側 (駅名または駅ID)。 */
+	sectionStartStation?: string | null;
+	/** 区間・駅連動の再表示: 終了側 (駅名または駅ID)。未指定時は開始側と同一 (単駅) 扱い。 */
+	sectionEndStation?: string | null;
+	/** 区間開始の何駅手前から再表示を開始するか。未指定時は 1。 */
+	stationsBefore?: number | null;
 }): Promise<void> {
 	const t = await loadTauri();
 	if (!t) return;
 	await t.invoke<void>("broadcast_notification", {
 		id: args.id ?? null,
+		orderNumber: args.orderNumber ?? null,
 		title: args.title ?? null,
+		summary: args.summary ?? null,
 		body: args.body ?? null,
 		priority: args.priority ?? null,
 		issuedAt: args.issuedAt ?? null,
+		receiver: args.receiver ?? null,
+		sender: args.sender ?? null,
+		iconText: args.iconText ?? null,
+		iconColorRgb: args.iconColorRgb ?? null,
+		iconImageBase64: args.iconImageBase64 ?? null,
+		acknowledged: args.acknowledged ?? false,
+		compactDisplay: args.compactDisplay ?? false,
+		sectionStartStation: args.sectionStartStation ?? null,
+		sectionEndStation: args.sectionEndStation ?? null,
+		stationsBefore: args.stationsBefore ?? null,
 	});
 }
 

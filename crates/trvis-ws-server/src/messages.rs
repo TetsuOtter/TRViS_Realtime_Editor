@@ -271,38 +271,118 @@ impl HeaderColorMessage {
 }
 
 /// サーバ → クライアント: 通告 (任意のお知らせ) 配信。
-/// `issued_at` は RFC3339 (ISO8601) 文字列。
+/// `issued_at` は RFC3339 (ISO8601) 文字列。TZ オフセットの有無で TRViS 側の表示
+/// (端末 TZ に変換 / そのまま表示) が変わるが、それは文字列自体から判定されるため
+/// このメッセージ側に別フィールドは無い (PR #301 のフォローアップ仕様)。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NotificationMessage {
 	#[serde(rename = "MessageType")]
 	pub message_type: String,
 	#[serde(rename = "Id", skip_serializing_if = "Option::is_none")]
 	pub id: Option<String>,
+	/// 指令番号。サーバ・現場運用側の管理番号で、表示のみに用いられる。
+	#[serde(rename = "OrderNumber", skip_serializing_if = "Option::is_none")]
+	pub order_number: Option<String>,
 	#[serde(rename = "Title", skip_serializing_if = "Option::is_none")]
 	pub title: Option<String>,
+	/// 小型バナー表示用の要約。未指定時は TRViS 側で `Title` にフォールバックする。
+	#[serde(rename = "Summary", skip_serializing_if = "Option::is_none")]
+	pub summary: Option<String>,
 	#[serde(rename = "Body", skip_serializing_if = "Option::is_none")]
 	pub body: Option<String>,
+	/// 0=通常, 1=重要 等。サーバ任意。
 	#[serde(rename = "Priority")]
 	pub priority: i32,
 	#[serde(rename = "IssuedAt", skip_serializing_if = "Option::is_none")]
 	pub issued_at: Option<String>,
+	/// 受信者。表示のみに用いられる。
+	#[serde(rename = "Receiver", skip_serializing_if = "Option::is_none")]
+	pub receiver: Option<String>,
+	/// 指令者 (発信者)。表示のみに用いられる。
+	#[serde(rename = "Sender", skip_serializing_if = "Option::is_none")]
+	pub sender: Option<String>,
+	/// アイコンとして表示する文字 (1〜2文字程度を想定)。`icon_image_base64` が
+	/// 指定されている場合はそちらが優先され、この文字は使用されない。
+	#[serde(rename = "IconText", skip_serializing_if = "Option::is_none")]
+	pub icon_text: Option<String>,
+	/// `icon_text` の背景色 (0xRRGGBB)。未指定時は TRViS 側の既定色が使われる。
+	#[serde(rename = "IconColor_RGB", skip_serializing_if = "Option::is_none")]
+	pub icon_color_rgb: Option<i32>,
+	/// アイコン画像の Base64 エンコードされたバイナリ (data URI プレフィックスを含んでいてもよい)。
+	/// 指定されている場合、`icon_text`/`icon_color_rgb` より優先して表示される。
+	#[serde(rename = "IconImageBase64", skip_serializing_if = "Option::is_none")]
+	pub icon_image_base64: Option<String>,
+	/// クライアントが当該通告を「受領済み」と判断してよいか (TRViS.JsonModels
+	/// `NotificationData.Acknowledged` 準拠)。`Priority` と同様に常に serialize する
+	/// (リファレンスサーバも常に出力し、TRViS 側は欠落を false 扱いする)。
+	/// エディタからの通常送信は新規通告なので `false`。
+	#[serde(rename = "Acknowledged")]
+	pub acknowledged: bool,
+	/// 初回表示を小型 (画面上部の1行バナー) で行うか。`false` (既定) は大型の中央
+	/// ポップアップ。`Acknowledged` と同様に常に serialize する (#254 フォローアップ仕様)。
+	#[serde(rename = "CompactDisplay")]
+	pub compact_display: bool,
+	/// この通告が対象とする区間・駅の開始側 (駅名または駅ID)。`section_end_station` と
+	/// 併せて区間を表す。`section_end_station` が無い場合は単駅指定とみなす。
+	#[serde(
+		rename = "SectionStartStation",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub section_start_station: Option<String>,
+	/// この通告が対象とする区間の終了側 (駅名または駅ID)。未指定時は
+	/// `section_start_station` と同一 (単駅) 扱い。
+	#[serde(rename = "SectionEndStation", skip_serializing_if = "Option::is_none")]
+	pub section_end_station: Option<String>,
+	/// 区間開始の何駅手前から (受領後の) 再表示を開始するか。TRViS 側の既定は 1。
+	/// `Priority` と同様に常に serialize する。
+	#[serde(rename = "StationsBefore")]
+	pub stations_before: i32,
+}
+
+/// `NotificationMessage::new` の引数まとめ。フィールド数が多いため位置引数ではなく
+/// 構造体で渡す。
+#[derive(Debug, Clone, Default)]
+pub struct NotificationParams {
+	pub id: Option<String>,
+	pub order_number: Option<String>,
+	pub title: Option<String>,
+	pub summary: Option<String>,
+	pub body: Option<String>,
+	pub priority: i32,
+	pub issued_at: Option<String>,
+	pub receiver: Option<String>,
+	pub sender: Option<String>,
+	pub icon_text: Option<String>,
+	pub icon_color_rgb: Option<i32>,
+	pub icon_image_base64: Option<String>,
+	pub acknowledged: bool,
+	pub compact_display: bool,
+	pub section_start_station: Option<String>,
+	pub section_end_station: Option<String>,
+	pub stations_before: i32,
 }
 
 impl NotificationMessage {
-	pub fn new(
-		id: Option<String>,
-		title: Option<String>,
-		body: Option<String>,
-		priority: i32,
-		issued_at: Option<String>,
-	) -> Self {
+	pub fn new(p: NotificationParams) -> Self {
 		Self {
 			message_type: "Notification".into(),
-			id,
-			title,
-			body,
-			priority,
-			issued_at,
+			id: p.id,
+			order_number: p.order_number,
+			title: p.title,
+			summary: p.summary,
+			body: p.body,
+			priority: p.priority,
+			issued_at: p.issued_at,
+			receiver: p.receiver,
+			sender: p.sender,
+			icon_text: p.icon_text,
+			icon_color_rgb: p.icon_color_rgb,
+			icon_image_base64: p.icon_image_base64,
+			acknowledged: p.acknowledged,
+			compact_display: p.compact_display,
+			section_start_station: p.section_start_station,
+			section_end_station: p.section_end_station,
+			stations_before: p.stations_before,
 		}
 	}
 }

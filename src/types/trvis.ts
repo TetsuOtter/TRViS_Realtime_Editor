@@ -174,16 +174,63 @@ export interface ServerHeaderColorMessage {
 	Color_RGB?: number | null;
 }
 
-/** サーバ → クライアント: 通告データ */
+/**
+ * サーバ → クライアント: 通告データ (TRViS.JsonModels `NotificationData` 準拠)。
+ * `Id` を伴う通告は TRViS 側で「受領可能」(受領ボタン付き) として扱われ、
+ * クライアントが受領すると `AcknowledgeNotification` を送り返す。`Id` 無しは
+ * 情報通知 (閉じるだけ)。
+ */
 export interface ServerNotificationMessage {
 	MessageType: "Notification";
 	Id?: string | null;
+	/** 指令番号。表示のみに用いられる (サーバ・現場運用側の管理番号)。 */
+	OrderNumber?: string | null;
 	Title?: string | null;
+	/** 小型バナー表示用の要約。未指定時は Title にフォールバックする。 */
+	Summary?: string | null;
 	Body?: string | null;
 	/** 0=通常, 1=重要 など (サーバ任意) */
 	Priority: number;
-	/** ISO8601 文字列 */
+	/**
+	 * ISO8601 文字列。TZ オフセット (`Z`/`+HH:mm`/`-HH:mm`) の有無で TRViS 側の表示が変わる:
+	 * オフセット有りは端末 TZ に変換して表示、無しはそのまま表示する。
+	 */
 	IssuedAt?: string | null;
+	/** 受信者。表示のみに用いられる。 */
+	Receiver?: string | null;
+	/** 指令者 (発信者)。表示のみに用いられる。 */
+	Sender?: string | null;
+	/** アイコン文字 (1〜2文字程度)。IconImageBase64 指定時は無視される。 */
+	IconText?: string | null;
+	/** IconText の背景色 (0xRRGGBB の整数)。未指定時は既定色。 */
+	IconColor_RGB?: number | null;
+	/** アイコン画像の Base64 (data URI プレフィックス可)。指定時は IconText/IconColor_RGB より優先。 */
+	IconImageBase64?: string | null;
+	/**
+	 * サーバがこのクライアントについて当該通告を「受領済み」と判断しているか。
+	 * true のときクライアントは既読扱いとし再ポップアップしない (再配信時想定)。
+	 * エディタからの通常送信は新規通告なので false。
+	 */
+	Acknowledged: boolean;
+	/**
+	 * 初回表示を小型 (画面上部の1行バナー) で行うか。未指定/false は大型の中央
+	 * ポップアップ。小型でも受領ボタンは表示される。
+	 */
+	CompactDisplay: boolean;
+	/**
+	 * この通告が対象とする区間・駅の開始側 (駅名または駅ID)。`SectionEndStation` と
+	 * 併せて区間を表す。`SectionEndStation` が未指定の場合は単駅指定とみなす。
+	 * 受領後、この区間の `StationsBefore` 駅手前で受領済み状態の小型バナーとして
+	 * 自動的に再表示され、区間を抜けると自動的に非表示になる。
+	 */
+	SectionStartStation?: string | null;
+	/**
+	 * この通告が対象とする区間の終了側 (駅名または駅ID)。未指定時は
+	 * `SectionStartStation` と同一 (単駅) 扱い。
+	 */
+	SectionEndStation?: string | null;
+	/** 区間開始の何駅手前から再表示を開始するか。既定 1。 */
+	StationsBefore: number;
 }
 
 /** サーバ → クライアント: タイトルバー時刻表示フォーマット指定 */

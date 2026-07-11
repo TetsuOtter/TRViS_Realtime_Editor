@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 
 import {
 	broadcastDiagramInfo,
@@ -8,7 +9,7 @@ import {
 	broadcastServerInfo,
 	broadcastTimeFormat,
 } from "../api/wsServer";
-import { useEditorStore } from "../store/editorStore";
+import { selectActiveTrain, useEditorStore } from "../store/editorStore";
 import type { OperationCommandAction } from "../types/trvis";
 
 const OPERATION_BUTTONS: { action: OperationCommandAction; label: string; danger?: boolean }[] = [
@@ -60,12 +61,33 @@ function intToRgbString(rgb: number): string {
 	return "#" + rgb.toString(16).padStart(6, "0");
 }
 
+/** TZ オフセット無しの ISO 8601 風文字列 (端末の現在時刻をそのまま表示させたい場合用)。 */
+function localIsoStringNoOffset(d: Date): string {
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 export function RemoteCommandsPanel() {
 	const [open, setOpen] = useState(false);
 	const [headerColor, setHeaderColor] = useState("#336699");
+	const [notifId, setNotifId] = useState("");
+	const [notifOrderNumber, setNotifOrderNumber] = useState("");
 	const [notifTitle, setNotifTitle] = useState("");
+	const [notifSummary, setNotifSummary] = useState("");
 	const [notifBody, setNotifBody] = useState("");
 	const [notifPriority, setNotifPriority] = useState(0);
+	const [notifReceiver, setNotifReceiver] = useState("");
+	const [notifSender, setNotifSender] = useState("");
+	const [notifIconText, setNotifIconText] = useState("");
+	const [notifIconColor, setNotifIconColor] = useState("#C62828");
+	const [notifIconImageBase64, setNotifIconImageBase64] = useState("");
+	/** 空 = 送信時に現在時刻 (TZ付き/UTC) を自動設定。編集すると送信時そのまま使う。 */
+	const [notifIssuedAt, setNotifIssuedAt] = useState("");
+	const [notifAcknowledged, setNotifAcknowledged] = useState(false);
+	const [notifCompactDisplay, setNotifCompactDisplay] = useState(false);
+	const [notifSectionStartStation, setNotifSectionStartStation] = useState("");
+	const [notifSectionEndStation, setNotifSectionEndStation] = useState("");
+	const [notifStationsBefore, setNotifStationsBefore] = useState(1);
 	const [busy, setBusy] = useState(false);
 
 	const serverInfo = useEditorStore((s) => s.serverInfo);
@@ -73,6 +95,13 @@ export function RemoteCommandsPanel() {
 	const diagramInfo = useEditorStore((s) => s.diagramInfo);
 	const setDiagramInfo = useEditorStore((s) => s.setDiagramInfo);
 	const workGroups = useEditorStore((s) => s.workGroups);
+	const activeTrain = useEditorStore(selectActiveTrain);
+	/** 現在表示中の列車の駅一覧 (区間指定プルダウンの候補)。Id があれば駅ID、無ければ駅名を値にする。 */
+	const stationOptions =
+		activeTrain?.TimetableRows.map((r) => ({
+			value: r.Id || r.StationName,
+			label: r.Id ? `${r.StationName} (${r.Id})` : r.StationName,
+		})).filter((o) => o.value) ?? [];
 	const [wgIdsText, setWgIdsText] = useState(() => diagramInfo.WorkGroupIds.join(", "));
 
 	const commitWgIds = (text: string) => {
@@ -207,6 +236,30 @@ export function RemoteCommandsPanel() {
 					{/* 通告 */}
 					<div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 240 }}>
 						<span style={labelStyle}>通告 (Notification)</span>
+						<div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+							<input
+								type="text"
+								placeholder="ID (空=情報通知 / 指定=受領可能)"
+								value={notifId}
+								onChange={(e) => setNotifId(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<button
+								type="button"
+								onClick={() => setNotifId(uuidv4())}
+								style={buttonStyle}
+								title="受領可能な通告にするための ID を生成"
+							>
+								生成
+							</button>
+						</div>
+						<input
+							type="text"
+							placeholder="指令番号 (表示のみ)"
+							value={notifOrderNumber}
+							onChange={(e) => setNotifOrderNumber(e.target.value)}
+							style={textInputStyle}
+						/>
 						<input
 							type="text"
 							placeholder="タイトル"
@@ -218,6 +271,20 @@ export function RemoteCommandsPanel() {
 								borderRadius: 4,
 								background: "var(--bg)",
 								fontSize: 12,
+							}}
+						/>
+						<textarea
+							placeholder="要約 (小型バナー表示用。空欄=タイトル)"
+							value={notifSummary}
+							onChange={(e) => setNotifSummary(e.target.value)}
+							style={{
+								padding: "3px 6px",
+								border: "1px solid var(--border)",
+								borderRadius: 4,
+								background: "var(--bg)",
+								fontSize: 12,
+								minHeight: 32,
+								resize: "vertical",
 							}}
 						/>
 						<textarea
@@ -234,6 +301,148 @@ export function RemoteCommandsPanel() {
 								resize: "vertical",
 							}}
 						/>
+						<div style={{ display: "flex", gap: 4 }}>
+							<input
+								type="text"
+								placeholder="受信者"
+								value={notifReceiver}
+								onChange={(e) => setNotifReceiver(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<input
+								type="text"
+								placeholder="指令者"
+								value={notifSender}
+								onChange={(e) => setNotifSender(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+						</div>
+						<div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+							<input
+								type="text"
+								placeholder="アイコン文字 (1〜2文字)"
+								value={notifIconText}
+								onChange={(e) => setNotifIconText(e.target.value)}
+								maxLength={2}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<input
+								type="color"
+								value={/^#[0-9a-fA-F]{6}$/.test(notifIconColor) ? notifIconColor : "#C62828"}
+								onChange={(e) => setNotifIconColor(e.target.value)}
+								title="アイコン背景色"
+								style={{ width: 32, height: 24, padding: 0, border: "1px solid var(--border)" }}
+							/>
+						</div>
+						<input
+							type="text"
+							placeholder="アイコン画像 Base64 (data URI 可。指定時は文字/色より優先)"
+							value={notifIconImageBase64}
+							onChange={(e) => setNotifIconImageBase64(e.target.value)}
+							style={textInputStyle}
+						/>
+						<div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+							<input
+								type="text"
+								placeholder="発信日時 (空=送信時のUTC現在時刻)"
+								value={notifIssuedAt}
+								onChange={(e) => setNotifIssuedAt(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<button
+								type="button"
+								onClick={() => setNotifIssuedAt(localIsoStringNoOffset(new Date()))}
+								style={buttonStyle}
+								title="端末の現在時刻を TZ オフセット無しでセット (TRViS側でそのまま表示される)"
+							>
+								今(TZなし)
+							</button>
+						</div>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 6,
+								fontSize: 12,
+								cursor: "pointer",
+							}}
+							title="受領済みとして送信する (受領ボタンは表示されず、既読扱いになる)"
+						>
+							<input
+								type="checkbox"
+								checked={notifAcknowledged}
+								onChange={(e) => setNotifAcknowledged(e.target.checked)}
+							/>
+							受領済みとして送信 (Acknowledged)
+						</label>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 6,
+								fontSize: 12,
+								cursor: "pointer",
+							}}
+						>
+							<input
+								type="checkbox"
+								checked={notifCompactDisplay}
+								onChange={(e) => setNotifCompactDisplay(e.target.checked)}
+							/>
+							小型バナー表示 (CompactDisplay)
+						</label>
+						<div style={{ display: "flex", gap: 4 }}>
+							<input
+								type="text"
+								placeholder="区間開始駅 (駅名/駅ID)"
+								value={notifSectionStartStation}
+								onChange={(e) => setNotifSectionStartStation(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<input
+								type="text"
+								placeholder="区間終了駅 (省略=単駅)"
+								value={notifSectionEndStation}
+								onChange={(e) => setNotifSectionEndStation(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+						</div>
+						<div style={{ display: "flex", gap: 4 }}>
+							<select
+								value=""
+								onChange={(e) => {
+									if (e.target.value) setNotifSectionStartStation(e.target.value);
+									e.target.value = "";
+								}}
+								disabled={stationOptions.length === 0}
+								title="現在表示中の列車の駅から選択 (駅IDで指定される)"
+								style={{ ...textInputStyle, flex: 1 }}
+							>
+								<option value="">区間開始駅を選択...</option>
+								{stationOptions.map((o) => (
+									<option key={`start-${o.value}`} value={o.value}>
+										{o.label}
+									</option>
+								))}
+							</select>
+							<select
+								value=""
+								onChange={(e) => {
+									if (e.target.value) setNotifSectionEndStation(e.target.value);
+									e.target.value = "";
+								}}
+								disabled={stationOptions.length === 0}
+								title="現在表示中の列車の駅から選択 (駅IDで指定される)"
+								style={{ ...textInputStyle, flex: 1 }}
+							>
+								<option value="">区間終了駅を選択...</option>
+								{stationOptions.map((o) => (
+									<option key={`end-${o.value}`} value={o.value}>
+										{o.label}
+									</option>
+								))}
+							</select>
+						</div>
 						<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
 							<label style={{ ...labelStyle, fontWeight: 400 }}>
 								Priority:
@@ -252,24 +461,62 @@ export function RemoteCommandsPanel() {
 									}}
 								/>
 							</label>
+							<label
+								style={{ ...labelStyle, fontWeight: 400 }}
+								title="区間開始の何駅手前から再表示するか (既定1)"
+							>
+								StationsBefore:
+								<input
+									type="number"
+									value={notifStationsBefore}
+									onChange={(e) => setNotifStationsBefore(Number(e.target.value) || 0)}
+									style={{
+										width: 48,
+										marginLeft: 4,
+										padding: "2px 4px",
+										border: "1px solid var(--border)",
+										borderRadius: 4,
+										background: "var(--bg)",
+										fontSize: 12,
+									}}
+								/>
+							</label>
 							<button
 								onClick={() =>
 									guard(
 										() =>
 											broadcastNotification({
+												id: notifId.trim() || null,
+												orderNumber: notifOrderNumber || null,
 												title: notifTitle || null,
+												summary: notifSummary || null,
 												body: notifBody || null,
 												priority: notifPriority,
-												issuedAt: new Date().toISOString(),
+												issuedAt: notifIssuedAt.trim() || new Date().toISOString(),
+												receiver: notifReceiver || null,
+												sender: notifSender || null,
+												iconText: notifIconText || null,
+												iconColorRgb: notifIconText
+													? (rgbStringToInt(notifIconColor) ?? null)
+													: null,
+												iconImageBase64: notifIconImageBase64 || null,
+												acknowledged: notifAcknowledged,
+												compactDisplay: notifCompactDisplay,
+												sectionStartStation: notifSectionStartStation.trim() || null,
+												sectionEndStation: notifSectionEndStation.trim() || null,
+												stationsBefore: notifStationsBefore,
 											}),
 										"Notification.send",
 									)
 								}
-								disabled={!notifTitle && !notifBody}
+								disabled={!notifTitle && !notifSummary && !notifBody}
 								style={{
 									...buttonStyle,
-									color: !notifTitle && !notifBody ? "var(--text-muted)" : "var(--text)",
-									cursor: !notifTitle && !notifBody ? "not-allowed" : "pointer",
+									color:
+										!notifTitle && !notifSummary && !notifBody
+											? "var(--text-muted)"
+											: "var(--text)",
+									cursor: !notifTitle && !notifSummary && !notifBody ? "not-allowed" : "pointer",
 								}}
 							>
 								送信

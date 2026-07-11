@@ -8,9 +8,9 @@ use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use trvis_ws_server::{
 	start, CachedSyncedData, DiagramInfoMessage, HeaderColorMessage, MonitorDirection, MonitorFrame,
-	NotificationMessage, OperationCommandMessage, OutboundMessage, SearchTrainResponseMessage,
-	SelectTrainMessage, ServerEvent, ServerHandle, ServerInfoMessage, ServerOptions,
-	ServerTimetableMessage, TimeFormatMessage, TrainSearchResultItem,
+	NotificationMessage, NotificationParams, OperationCommandMessage, OutboundMessage,
+	SearchTrainResponseMessage, SelectTrainMessage, ServerEvent, ServerHandle, ServerInfoMessage,
+	ServerOptions, ServerTimetableMessage, TimeFormatMessage, TrainSearchResultItem,
 };
 
 #[derive(Default)]
@@ -213,17 +213,48 @@ async fn broadcast_header_color(
 
 /// 全クライアントへ `Notification` を送る。
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn broadcast_notification(
 	state: State<'_, AppState>,
 	id: Option<String>,
+	order_number: Option<String>,
 	title: Option<String>,
+	summary: Option<String>,
 	body: Option<String>,
 	priority: Option<i32>,
 	issued_at: Option<String>,
+	receiver: Option<String>,
+	sender: Option<String>,
+	icon_text: Option<String>,
+	icon_color_rgb: Option<i32>,
+	icon_image_base64: Option<String>,
+	acknowledged: Option<bool>,
+	compact_display: Option<bool>,
+	section_start_station: Option<String>,
+	section_end_station: Option<String>,
+	stations_before: Option<i32>,
 ) -> Result<(), String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
-	let msg = NotificationMessage::new(id, title, body, priority.unwrap_or(0), issued_at);
+	let msg = NotificationMessage::new(NotificationParams {
+		id,
+		order_number,
+		title,
+		summary,
+		body,
+		priority: priority.unwrap_or(0),
+		issued_at,
+		receiver,
+		sender,
+		icon_text,
+		icon_color_rgb,
+		icon_image_base64,
+		acknowledged: acknowledged.unwrap_or(false),
+		compact_display: compact_display.unwrap_or(false),
+		section_start_station,
+		section_end_station,
+		stations_before: stations_before.unwrap_or(1),
+	});
 	handle
 		.state
 		.broadcast(OutboundMessage::Notification(msg))

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 import {
@@ -12,6 +12,7 @@ import {
 } from "../api/wsServer";
 import { selectActiveTrain, useEditorStore } from "../store/editorStore";
 import type { OperationCommandAction } from "../types/trvis";
+import { fileToBase64, isLikelyBase64, soundFormatFromFileName } from "../types/trvisEnums";
 
 const OPERATION_BUTTONS: { action: OperationCommandAction; label: string; danger?: boolean }[] = [
 	{ action: "StartOperation", label: "運行開始" },
@@ -66,6 +67,121 @@ function intToRgbString(rgb: number): string {
 function localIsoStringNoOffset(d: Date): string {
 	const pad = (n: number) => String(n).padStart(2, "0");
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/**
+ * 通告音 (Base64) の入力欄。ファイル選択で wav/mp3 を base64 化できる。
+ * 大きな base64 を controlled な input にそのまま流すと描画が重くなるため、
+ * base64 らしい長い内容はファイル添付直後に固定文字表示へ畳み、
+ * ユーザが明示的に開いたときだけ input を描画する。
+ */
+function SoundPicker({
+	base64,
+	onBase64Change,
+	format,
+	onFormatChange,
+	placeholder,
+}: {
+	base64: string;
+	onBase64Change: (v: string) => void;
+	format: string;
+	onFormatChange: (v: string) => void;
+	placeholder: string;
+}) {
+	const fileRef = useRef<HTMLInputElement>(null);
+	const [busy, setBusy] = useState(false);
+	const [revealed, setRevealed] = useState(false);
+	const heavy = isLikelyBase64(base64);
+	const hideInput = heavy && !revealed;
+
+	const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		e.target.value = "";
+		if (!file) return;
+		setBusy(true);
+		try {
+			const b64 = await fileToBase64(file);
+			onBase64Change(b64);
+			const fmt = soundFormatFromFileName(file.name);
+			if (fmt) onFormatChange(fmt);
+			setRevealed(false);
+		} catch (err) {
+			console.error("音声ファイルの読み込みに失敗しました:", err);
+			alert(`音声ファイルの読み込みに失敗しました: ${err}`);
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+			<input
+				ref={fileRef}
+				type="file"
+				accept=".wav,.mp3,audio/wav,audio/mpeg"
+				onChange={onPick}
+				style={{ display: "none" }}
+			/>
+			<div style={{ display: "flex", gap: 4 }}>
+				{hideInput ? (
+					<div
+						style={{
+							...textInputStyle,
+							flex: 1,
+							color: "var(--text-muted)",
+							background: "var(--bg-panel)",
+						}}
+					>
+						base64 データ ({base64.length.toLocaleString()} 文字) — 描画が重いため既定で非表示
+					</div>
+				) : (
+					<input
+						type="text"
+						placeholder={placeholder}
+						value={base64}
+						onChange={(e) => onBase64Change(e.target.value)}
+						style={{ ...textInputStyle, flex: 1 }}
+					/>
+				)}
+				<select
+					value={format}
+					onChange={(e) => onFormatChange(e.target.value)}
+					style={{ ...textInputStyle, width: 72, flex: "0 0 auto" }}
+				>
+					<option value="">形式</option>
+					<option value="wav">wav</option>
+					<option value="mp3">mp3</option>
+				</select>
+			</div>
+			<div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+				<button
+					type="button"
+					onClick={() => fileRef.current?.click()}
+					disabled={busy}
+					style={{ ...buttonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? "wait" : "pointer" }}
+				>
+					{busy ? "読み込み中…" : "ファイルを選択 (wav/mp3)"}
+				</button>
+				{heavy && (
+					<button type="button" onClick={() => setRevealed((r) => !r)} style={buttonStyle}>
+						{revealed ? "テキストを隠す" : "テキストを表示/編集"}
+					</button>
+				)}
+				{base64 && (
+					<button
+						type="button"
+						onClick={() => {
+							onBase64Change("");
+							setRevealed(false);
+						}}
+						style={buttonStyle}
+					>
+						クリア
+					</button>
+				)}
+			</div>
+		</div>
+	);
 }
 
 export function RemoteCommandsPanel() {
@@ -350,42 +466,20 @@ export function RemoteCommandsPanel() {
 							onChange={(e) => setNotifIconImageBase64(e.target.value)}
 							style={textInputStyle}
 						/>
-						<div style={{ display: "flex", gap: 4 }}>
-							<input
-								type="text"
-								placeholder="受信音 Base64 (未指定=既定音/無音)"
-								value={notifReceivedSoundBase64}
-								onChange={(e) => setNotifReceivedSoundBase64(e.target.value)}
-								style={{ ...textInputStyle, flex: 1 }}
-							/>
-							<select
-								value={notifReceivedSoundFormat}
-								onChange={(e) => setNotifReceivedSoundFormat(e.target.value)}
-								style={{ ...textInputStyle, width: 72, flex: "0 0 auto" }}
-							>
-								<option value="">形式</option>
-								<option value="wav">wav</option>
-								<option value="mp3">mp3</option>
-							</select>
-						</div>
-						<div style={{ display: "flex", gap: 4 }}>
-							<input
-								type="text"
-								placeholder="接近音 Base64 (未指定=既定音/無音)"
-								value={notifApproachSoundBase64}
-								onChange={(e) => setNotifApproachSoundBase64(e.target.value)}
-								style={{ ...textInputStyle, flex: 1 }}
-							/>
-							<select
-								value={notifApproachSoundFormat}
-								onChange={(e) => setNotifApproachSoundFormat(e.target.value)}
-								style={{ ...textInputStyle, width: 72, flex: "0 0 auto" }}
-							>
-								<option value="">形式</option>
-								<option value="wav">wav</option>
-								<option value="mp3">mp3</option>
-							</select>
-						</div>
+						<SoundPicker
+							base64={notifReceivedSoundBase64}
+							onBase64Change={setNotifReceivedSoundBase64}
+							format={notifReceivedSoundFormat}
+							onFormatChange={setNotifReceivedSoundFormat}
+							placeholder="受信音 Base64 (未指定=既定音/無音)"
+						/>
+						<SoundPicker
+							base64={notifApproachSoundBase64}
+							onBase64Change={setNotifApproachSoundBase64}
+							format={notifApproachSoundFormat}
+							onFormatChange={setNotifApproachSoundFormat}
+							placeholder="接近音 Base64 (未指定=既定音/無音)"
+						/>
 						<div style={{ display: "flex", gap: 4, alignItems: "center" }}>
 							<input
 								type="text"
@@ -580,42 +674,20 @@ export function RemoteCommandsPanel() {
 					{/* 通告音の既定値 */}
 					<div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 240 }}>
 						<span style={labelStyle}>通告音の既定値 (DefaultSound)</span>
-						<div style={{ display: "flex", gap: 4 }}>
-							<input
-								type="text"
-								placeholder="受信音 Base64 (未指定=既定を解除)"
-								value={defaultReceivedSoundBase64}
-								onChange={(e) => setDefaultReceivedSoundBase64(e.target.value)}
-								style={{ ...textInputStyle, flex: 1 }}
-							/>
-							<select
-								value={defaultReceivedSoundFormat}
-								onChange={(e) => setDefaultReceivedSoundFormat(e.target.value)}
-								style={{ ...textInputStyle, width: 72, flex: "0 0 auto" }}
-							>
-								<option value="">形式</option>
-								<option value="wav">wav</option>
-								<option value="mp3">mp3</option>
-							</select>
-						</div>
-						<div style={{ display: "flex", gap: 4 }}>
-							<input
-								type="text"
-								placeholder="接近音 Base64 (未指定=既定を解除)"
-								value={defaultApproachSoundBase64}
-								onChange={(e) => setDefaultApproachSoundBase64(e.target.value)}
-								style={{ ...textInputStyle, flex: 1 }}
-							/>
-							<select
-								value={defaultApproachSoundFormat}
-								onChange={(e) => setDefaultApproachSoundFormat(e.target.value)}
-								style={{ ...textInputStyle, width: 72, flex: "0 0 auto" }}
-							>
-								<option value="">形式</option>
-								<option value="wav">wav</option>
-								<option value="mp3">mp3</option>
-							</select>
-						</div>
+						<SoundPicker
+							base64={defaultReceivedSoundBase64}
+							onBase64Change={setDefaultReceivedSoundBase64}
+							format={defaultReceivedSoundFormat}
+							onFormatChange={setDefaultReceivedSoundFormat}
+							placeholder="受信音 Base64 (未指定=既定を解除)"
+						/>
+						<SoundPicker
+							base64={defaultApproachSoundBase64}
+							onBase64Change={setDefaultApproachSoundBase64}
+							format={defaultApproachSoundFormat}
+							onFormatChange={setDefaultApproachSoundFormat}
+							placeholder="接近音 Base64 (未指定=既定を解除)"
+						/>
 						<button
 							onClick={() =>
 								guard(

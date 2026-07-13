@@ -49,6 +49,22 @@ export function contentTypeFromFileName(name: string): number | null {
 	}
 }
 
+/**
+ * ファイル名の拡張子から通告音の形式 ("wav"/"mp3") を推定する。
+ * 判定できない場合は null (=形式を変更しない)。
+ */
+export function soundFormatFromFileName(name: string): "wav" | "mp3" | null {
+	const ext = name.toLowerCase().split(".").pop() ?? "";
+	switch (ext) {
+		case "wav":
+			return "wav";
+		case "mp3":
+			return "mp3";
+		default:
+			return null;
+	}
+}
+
 /** これより長く、かつ base64 らしい内容は textarea 描画が重いとみなす閾値。 */
 export const LARGE_CONTENT_THRESHOLD = 4096;
 

@@ -231,6 +231,42 @@ export interface ServerNotificationMessage {
 	SectionEndStation?: string | null;
 	/** 区間開始の何駅手前から再表示を開始するか。既定 1。 */
 	StationsBefore: number;
+	/**
+	 * この通告固有の受信音 (初回表示時に再生) の Base64 エンコードされたバイナリ
+	 * (data URI プレフィックス可)。未指定/null の場合、`DefaultSound` で設定された
+	 * 受信音の既定値があればそれを使い、無ければ無音。
+	 */
+	ReceivedSoundBase64?: string | null;
+	/** `ReceivedSoundBase64` の形式 ("wav"/"mp3")。それ以外は無音として扱われる。 */
+	ReceivedSoundFormat?: string | null;
+	/**
+	 * この通告固有の接近音 (区間連動の再表示バナー表示時に再生) の Base64 エンコード
+	 * されたバイナリ。未指定/null の場合、`DefaultSound` の接近音の既定値があれば
+	 * それを使い、無ければ無音。
+	 */
+	ApproachSoundBase64?: string | null;
+	/** `ApproachSoundBase64` の形式 ("wav"/"mp3")。 */
+	ApproachSoundFormat?: string | null;
+}
+
+/**
+ * サーバ → クライアント: 通告の受信音・接近音の既定値を設定する。個別の
+ * `Notification` が該当ロールを指定しない場合のフォールバックとして使われる。
+ * 送信するたびに両ロールをフルに置き換える (差分更新ではない)。対象ロールの
+ * フィールドが未指定/null の場合、そのロールの既定値は「無し (無音)」に
+ * リセットされる。既定値はセッション中のみ有効なメモリ上の状態で、WebSocket
+ * 切断時に破棄される。
+ */
+export interface ServerDefaultSoundMessage {
+	MessageType: "DefaultSound";
+	/** 受信音の既定として使う音声の Base64 エンコードされたバイナリ。null/省略でこのロールの既定を解除する。 */
+	ReceivedSoundBase64?: string | null;
+	/** `ReceivedSoundBase64` の形式 ("wav"/"mp3")。 */
+	ReceivedSoundFormat?: string | null;
+	/** 接近音の既定として使う音声の Base64 エンコードされたバイナリ。null/省略でこのロールの既定を解除する。 */
+	ApproachSoundBase64?: string | null;
+	/** `ApproachSoundBase64` の形式 ("wav"/"mp3")。 */
+	ApproachSoundFormat?: string | null;
 }
 
 /** サーバ → クライアント: タイトルバー時刻表示フォーマット指定 */
@@ -284,6 +320,7 @@ export type ServerMessage =
 	| ServerOperationCommandMessage
 	| ServerHeaderColorMessage
 	| ServerNotificationMessage
+	| ServerDefaultSoundMessage
 	| ServerTimeFormatMessage
 	| ServerSearchTrainResponseMessage;
 

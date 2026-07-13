@@ -2,6 +2,7 @@ import { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 
 import {
+	broadcastDefaultSound,
 	broadcastDiagramInfo,
 	broadcastHeaderColor,
 	broadcastNotification,
@@ -88,6 +89,14 @@ export function RemoteCommandsPanel() {
 	const [notifSectionStartStation, setNotifSectionStartStation] = useState("");
 	const [notifSectionEndStation, setNotifSectionEndStation] = useState("");
 	const [notifStationsBefore, setNotifStationsBefore] = useState(1);
+	const [notifReceivedSoundBase64, setNotifReceivedSoundBase64] = useState("");
+	const [notifReceivedSoundFormat, setNotifReceivedSoundFormat] = useState("");
+	const [notifApproachSoundBase64, setNotifApproachSoundBase64] = useState("");
+	const [notifApproachSoundFormat, setNotifApproachSoundFormat] = useState("");
+	const [defaultReceivedSoundBase64, setDefaultReceivedSoundBase64] = useState("");
+	const [defaultReceivedSoundFormat, setDefaultReceivedSoundFormat] = useState("");
+	const [defaultApproachSoundBase64, setDefaultApproachSoundBase64] = useState("");
+	const [defaultApproachSoundFormat, setDefaultApproachSoundFormat] = useState("");
 	const [busy, setBusy] = useState(false);
 
 	const serverInfo = useEditorStore((s) => s.serverInfo);
@@ -341,6 +350,42 @@ export function RemoteCommandsPanel() {
 							onChange={(e) => setNotifIconImageBase64(e.target.value)}
 							style={textInputStyle}
 						/>
+						<div style={{ display: "flex", gap: 4 }}>
+							<input
+								type="text"
+								placeholder="受信音 Base64 (未指定=既定音/無音)"
+								value={notifReceivedSoundBase64}
+								onChange={(e) => setNotifReceivedSoundBase64(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<select
+								value={notifReceivedSoundFormat}
+								onChange={(e) => setNotifReceivedSoundFormat(e.target.value)}
+								style={{ ...textInputStyle, width: 72, flex: "0 0 auto" }}
+							>
+								<option value="">形式</option>
+								<option value="wav">wav</option>
+								<option value="mp3">mp3</option>
+							</select>
+						</div>
+						<div style={{ display: "flex", gap: 4 }}>
+							<input
+								type="text"
+								placeholder="接近音 Base64 (未指定=既定音/無音)"
+								value={notifApproachSoundBase64}
+								onChange={(e) => setNotifApproachSoundBase64(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<select
+								value={notifApproachSoundFormat}
+								onChange={(e) => setNotifApproachSoundFormat(e.target.value)}
+								style={{ ...textInputStyle, width: 72, flex: "0 0 auto" }}
+							>
+								<option value="">形式</option>
+								<option value="wav">wav</option>
+								<option value="mp3">mp3</option>
+							</select>
+						</div>
 						<div style={{ display: "flex", gap: 4, alignItems: "center" }}>
 							<input
 								type="text"
@@ -505,6 +550,14 @@ export function RemoteCommandsPanel() {
 												sectionStartStation: notifSectionStartStation.trim() || null,
 												sectionEndStation: notifSectionEndStation.trim() || null,
 												stationsBefore: notifStationsBefore,
+												receivedSoundBase64: notifReceivedSoundBase64.trim() || null,
+												receivedSoundFormat: notifReceivedSoundBase64.trim()
+													? notifReceivedSoundFormat || null
+													: null,
+												approachSoundBase64: notifApproachSoundBase64.trim() || null,
+												approachSoundFormat: notifApproachSoundBase64.trim()
+													? notifApproachSoundFormat || null
+													: null,
 											}),
 										"Notification.send",
 									)
@@ -522,6 +575,69 @@ export function RemoteCommandsPanel() {
 								送信
 							</button>
 						</div>
+					</div>
+
+					{/* 通告音の既定値 */}
+					<div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 240 }}>
+						<span style={labelStyle}>通告音の既定値 (DefaultSound)</span>
+						<div style={{ display: "flex", gap: 4 }}>
+							<input
+								type="text"
+								placeholder="受信音 Base64 (未指定=既定を解除)"
+								value={defaultReceivedSoundBase64}
+								onChange={(e) => setDefaultReceivedSoundBase64(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<select
+								value={defaultReceivedSoundFormat}
+								onChange={(e) => setDefaultReceivedSoundFormat(e.target.value)}
+								style={{ ...textInputStyle, width: 72, flex: "0 0 auto" }}
+							>
+								<option value="">形式</option>
+								<option value="wav">wav</option>
+								<option value="mp3">mp3</option>
+							</select>
+						</div>
+						<div style={{ display: "flex", gap: 4 }}>
+							<input
+								type="text"
+								placeholder="接近音 Base64 (未指定=既定を解除)"
+								value={defaultApproachSoundBase64}
+								onChange={(e) => setDefaultApproachSoundBase64(e.target.value)}
+								style={{ ...textInputStyle, flex: 1 }}
+							/>
+							<select
+								value={defaultApproachSoundFormat}
+								onChange={(e) => setDefaultApproachSoundFormat(e.target.value)}
+								style={{ ...textInputStyle, width: 72, flex: "0 0 auto" }}
+							>
+								<option value="">形式</option>
+								<option value="wav">wav</option>
+								<option value="mp3">mp3</option>
+							</select>
+						</div>
+						<button
+							onClick={() =>
+								guard(
+									() =>
+										broadcastDefaultSound({
+											receivedSoundBase64: defaultReceivedSoundBase64.trim() || null,
+											receivedSoundFormat: defaultReceivedSoundBase64.trim()
+												? defaultReceivedSoundFormat || null
+												: null,
+											approachSoundBase64: defaultApproachSoundBase64.trim() || null,
+											approachSoundFormat: defaultApproachSoundBase64.trim()
+												? defaultApproachSoundFormat || null
+												: null,
+										}),
+									"DefaultSound.send",
+								)
+							}
+							style={buttonStyle}
+							title="両ロールを送信内容でフルに置き換える。空欄のロールは既定なし (無音) にリセットされる"
+						>
+							適用
+						</button>
 					</div>
 
 					{/* サーバー情報 */}

@@ -217,6 +217,14 @@ export async function broadcastNotification(args: {
 	sectionEndStation?: string | null;
 	/** 区間開始の何駅手前から再表示を開始するか。未指定時は 1。 */
 	stationsBefore?: number | null;
+	/** この通告固有の受信音の Base64 (data URI プレフィックス可)。未指定時は DefaultSound の既定値、無ければ無音。 */
+	receivedSoundBase64?: string | null;
+	/** receivedSoundBase64 の形式 ("wav"/"mp3")。 */
+	receivedSoundFormat?: string | null;
+	/** この通告固有の接近音の Base64。未指定時は DefaultSound の既定値、無ければ無音。 */
+	approachSoundBase64?: string | null;
+	/** approachSoundBase64 の形式 ("wav"/"mp3")。 */
+	approachSoundFormat?: string | null;
 }): Promise<void> {
 	const t = await loadTauri();
 	if (!t) return;
@@ -238,6 +246,35 @@ export async function broadcastNotification(args: {
 		sectionStartStation: args.sectionStartStation ?? null,
 		sectionEndStation: args.sectionEndStation ?? null,
 		stationsBefore: args.stationsBefore ?? null,
+		receivedSoundBase64: args.receivedSoundBase64 ?? null,
+		receivedSoundFormat: args.receivedSoundFormat ?? null,
+		approachSoundBase64: args.approachSoundBase64 ?? null,
+		approachSoundFormat: args.approachSoundFormat ?? null,
+	});
+}
+
+/**
+ * 通告の受信音・接近音の既定値を設定する。個別の `Notification` が該当ロールを
+ * 指定しない場合のフォールバックとして使われる。送信するたびに両ロールをフルに
+ * 置き換える (差分更新ではない)。省略/null のロールは既定値なし (無音) にリセットされる。
+ */
+export async function broadcastDefaultSound(args: {
+	/** 受信音の既定として使う音声の Base64 (data URI プレフィックス可)。null/省略でこのロールの既定を解除する。 */
+	receivedSoundBase64?: string | null;
+	/** receivedSoundBase64 の形式 ("wav"/"mp3")。 */
+	receivedSoundFormat?: string | null;
+	/** 接近音の既定として使う音声の Base64。null/省略でこのロールの既定を解除する。 */
+	approachSoundBase64?: string | null;
+	/** approachSoundBase64 の形式 ("wav"/"mp3")。 */
+	approachSoundFormat?: string | null;
+}): Promise<void> {
+	const t = await loadTauri();
+	if (!t) return;
+	await t.invoke<void>("broadcast_default_sound", {
+		receivedSoundBase64: args.receivedSoundBase64 ?? null,
+		receivedSoundFormat: args.receivedSoundFormat ?? null,
+		approachSoundBase64: args.approachSoundBase64 ?? null,
+		approachSoundFormat: args.approachSoundFormat ?? null,
 	});
 }
 

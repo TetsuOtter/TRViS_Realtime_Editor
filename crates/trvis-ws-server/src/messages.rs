@@ -337,6 +337,33 @@ pub struct NotificationMessage {
 	/// `Priority` と同様に常に serialize する。
 	#[serde(rename = "StationsBefore")]
 	pub stations_before: i32,
+	/// この通告固有の受信音 (初回表示時に再生) の Base64 エンコードされたバイナリ
+	/// (data URI プレフィックスを含んでいてもよい)。未指定時は `DefaultSound` の
+	/// 受信音の既定値、無ければ無音 (#329)。
+	#[serde(
+		rename = "ReceivedSoundBase64",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub received_sound_base64: Option<String>,
+	/// `received_sound_base64` の形式 ("wav"/"mp3")。
+	#[serde(
+		rename = "ReceivedSoundFormat",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub received_sound_format: Option<String>,
+	/// この通告固有の接近音 (区間連動の再表示時に再生) の Base64 エンコードされた
+	/// バイナリ。未指定時は `DefaultSound` の接近音の既定値、無ければ無音 (#329)。
+	#[serde(
+		rename = "ApproachSoundBase64",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub approach_sound_base64: Option<String>,
+	/// `approach_sound_base64` の形式 ("wav"/"mp3")。
+	#[serde(
+		rename = "ApproachSoundFormat",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub approach_sound_format: Option<String>,
 }
 
 /// `NotificationMessage::new` の引数まとめ。フィールド数が多いため位置引数ではなく
@@ -360,6 +387,10 @@ pub struct NotificationParams {
 	pub section_start_station: Option<String>,
 	pub section_end_station: Option<String>,
 	pub stations_before: i32,
+	pub received_sound_base64: Option<String>,
+	pub received_sound_format: Option<String>,
+	pub approach_sound_base64: Option<String>,
+	pub approach_sound_format: Option<String>,
 }
 
 impl NotificationMessage {
@@ -383,6 +414,62 @@ impl NotificationMessage {
 			section_start_station: p.section_start_station,
 			section_end_station: p.section_end_station,
 			stations_before: p.stations_before,
+			received_sound_base64: p.received_sound_base64,
+			received_sound_format: p.received_sound_format,
+			approach_sound_base64: p.approach_sound_base64,
+			approach_sound_format: p.approach_sound_format,
+		}
+	}
+}
+
+/// サーバ → クライアント: 通告の受信音・接近音の既定値を設定する。受信するたびに
+/// 両ロールをフルに置き換える (差分更新ではない)。対象ロールのフィールドが無い
+/// 場合、そのロールの既定値は「無し (無音)」にリセットされる。セッション中のみ
+/// 有効な状態として TRViS 側のメモリに保持され、WebSocket 切断時に破棄される
+/// (このサーバ自身は状態を保持せず、受信の都度そのままブロードキャストするのみ) (#329)。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DefaultSoundMessage {
+	#[serde(rename = "MessageType")]
+	pub message_type: String,
+	/// 受信音の既定として使う音声の Base64 エンコードされたバイナリ。
+	#[serde(
+		rename = "ReceivedSoundBase64",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub received_sound_base64: Option<String>,
+	/// `received_sound_base64` の形式 ("wav"/"mp3")。
+	#[serde(
+		rename = "ReceivedSoundFormat",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub received_sound_format: Option<String>,
+	/// 接近音の既定として使う音声の Base64 エンコードされたバイナリ。
+	#[serde(
+		rename = "ApproachSoundBase64",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub approach_sound_base64: Option<String>,
+	/// `approach_sound_base64` の形式 ("wav"/"mp3")。
+	#[serde(
+		rename = "ApproachSoundFormat",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub approach_sound_format: Option<String>,
+}
+
+impl DefaultSoundMessage {
+	pub fn new(
+		received_sound_base64: Option<String>,
+		received_sound_format: Option<String>,
+		approach_sound_base64: Option<String>,
+		approach_sound_format: Option<String>,
+	) -> Self {
+		Self {
+			message_type: "DefaultSound".into(),
+			received_sound_base64,
+			received_sound_format,
+			approach_sound_base64,
+			approach_sound_format,
 		}
 	}
 }
@@ -467,7 +554,8 @@ pub enum OutboundMessage {
 	SelectTrain(SelectTrainMessage),
 	OperationCommand(OperationCommandMessage),
 	HeaderColor(HeaderColorMessage),
-	Notification(NotificationMessage),
+	Notification(Box<NotificationMessage>),
+	DefaultSound(DefaultSoundMessage),
 	TimeFormat(TimeFormatMessage),
 	SearchTrainResponse(SearchTrainResponseMessage),
 	/// デバッグ用: 任意のテキストを一切加工せずそのまま送る。
@@ -486,6 +574,7 @@ impl OutboundMessage {
 			OutboundMessage::OperationCommand(m) => serde_json::to_string(m),
 			OutboundMessage::HeaderColor(m) => serde_json::to_string(m),
 			OutboundMessage::Notification(m) => serde_json::to_string(m),
+			OutboundMessage::DefaultSound(m) => serde_json::to_string(m),
 			OutboundMessage::TimeFormat(m) => serde_json::to_string(m),
 			OutboundMessage::SearchTrainResponse(m) => serde_json::to_string(m),
 			OutboundMessage::Raw(s) => Ok(s.clone()),

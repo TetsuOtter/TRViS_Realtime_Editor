@@ -7,10 +7,11 @@ use serde_json::Value;
 use tauri::{Emitter, Manager, State};
 use tokio::sync::Mutex;
 use trvis_ws_server::{
-	start, CachedSyncedData, DiagramInfoMessage, HeaderColorMessage, MonitorDirection, MonitorFrame,
-	NotificationMessage, NotificationParams, OperationCommandMessage, OutboundMessage,
-	SearchTrainResponseMessage, SelectTrainMessage, ServerEvent, ServerHandle, ServerInfoMessage,
-	ServerOptions, ServerTimetableMessage, TimeFormatMessage, TrainSearchResultItem,
+	start, CachedSyncedData, DefaultSoundMessage, DiagramInfoMessage, HeaderColorMessage,
+	MonitorDirection, MonitorFrame, NotificationMessage, NotificationParams, OperationCommandMessage,
+	OutboundMessage, SearchTrainResponseMessage, SelectTrainMessage, ServerEvent, ServerHandle,
+	ServerInfoMessage, ServerOptions, ServerTimetableMessage, TimeFormatMessage,
+	TrainSearchResultItem,
 };
 
 #[derive(Default)]
@@ -233,6 +234,10 @@ async fn broadcast_notification(
 	section_start_station: Option<String>,
 	section_end_station: Option<String>,
 	stations_before: Option<i32>,
+	received_sound_base64: Option<String>,
+	received_sound_format: Option<String>,
+	approach_sound_base64: Option<String>,
+	approach_sound_format: Option<String>,
 ) -> Result<(), String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
@@ -254,10 +259,40 @@ async fn broadcast_notification(
 		section_start_station,
 		section_end_station,
 		stations_before: stations_before.unwrap_or(1),
+		received_sound_base64,
+		received_sound_format,
+		approach_sound_base64,
+		approach_sound_format,
 	});
 	handle
 		.state
-		.broadcast(OutboundMessage::Notification(msg))
+		.broadcast(OutboundMessage::Notification(Box::new(msg)))
+		.await;
+	Ok(())
+}
+
+/// 全クライアントへ `DefaultSound` を送る。通告の受信音・接近音の既定値を
+/// (両ロールとも) フルに置き換える。対象ロールの引数が `None` の場合、そのロールの
+/// 既定値は「無し (無音)」にリセットされる (#329)。
+#[tauri::command]
+async fn broadcast_default_sound(
+	state: State<'_, AppState>,
+	received_sound_base64: Option<String>,
+	received_sound_format: Option<String>,
+	approach_sound_base64: Option<String>,
+	approach_sound_format: Option<String>,
+) -> Result<(), String> {
+	let guard = state.server.lock().await;
+	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
+	let msg = DefaultSoundMessage::new(
+		received_sound_base64,
+		received_sound_format,
+		approach_sound_base64,
+		approach_sound_format,
+	);
+	handle
+		.state
+		.broadcast(OutboundMessage::DefaultSound(msg))
 		.await;
 	Ok(())
 }
@@ -654,6 +689,7 @@ pub fn run() {
 			broadcast_operation_command,
 			broadcast_header_color,
 			broadcast_notification,
+			broadcast_default_sound,
 			broadcast_time_format,
 			broadcast_server_info,
 			respond_server_info,

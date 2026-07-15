@@ -619,9 +619,9 @@ mod tests {
 	#[tokio::test]
 	async fn server_serializes_remote_command_messages() {
 		use crate::messages::{
-			DiagramInfoMessage, HeaderColorMessage, NotificationMessage, NotificationParams,
-			OperationCommandMessage, SearchTrainResponseMessage, SelectTrainMessage, ServerInfoMessage,
-			TimeFormatMessage, TrainSearchResultItem,
+			DefaultSoundMessage, DiagramInfoMessage, HeaderColorMessage, NotificationMessage,
+			NotificationParams, OperationCommandMessage, SearchTrainResponseMessage, SelectTrainMessage,
+			ServerInfoMessage, TimeFormatMessage, TrainSearchResultItem,
 		};
 		// 主要な outbound 型が期待した JSON フィールドを出力することを最小チェック。
 		let s = serde_json::to_string(&ServerInfoMessage::new(
@@ -745,6 +745,10 @@ mod tests {
 		assert!(minimal.contains(r#""StationsBefore":0"#));
 		assert!(!minimal.contains("SectionStartStation"));
 		assert!(!minimal.contains("SectionEndStation"));
+		assert!(!minimal.contains("ReceivedSoundBase64"));
+		assert!(!minimal.contains("ReceivedSoundFormat"));
+		assert!(!minimal.contains("ApproachSoundBase64"));
+		assert!(!minimal.contains("ApproachSoundFormat"));
 
 		// CompactDisplay/SectionStartStation/SectionEndStation/StationsBefore (#254 followup)。
 		let s = serde_json::to_string(&NotificationMessage::new(NotificationParams {
@@ -760,6 +764,43 @@ mod tests {
 		assert!(s.contains(r#""SectionStartStation":"石川""#));
 		assert!(s.contains(r#""SectionEndStation":"川部""#));
 		assert!(s.contains(r#""StationsBefore":2"#));
+
+		// ReceivedSound/ApproachSound (通告固有の音声, #329)。
+		let s = serde_json::to_string(&NotificationMessage::new(NotificationParams {
+			title: Some("音付き通告".into()),
+			received_sound_base64: Some("UkVDRUlWRUQ=".into()),
+			received_sound_format: Some("wav".into()),
+			approach_sound_base64: Some("QVBQUk9BQ0g=".into()),
+			approach_sound_format: Some("mp3".into()),
+			..Default::default()
+		}))
+		.unwrap();
+		assert!(s.contains(r#""ReceivedSoundBase64":"UkVDRUlWRUQ=""#));
+		assert!(s.contains(r#""ReceivedSoundFormat":"wav""#));
+		assert!(s.contains(r#""ApproachSoundBase64":"QVBQUk9BQ0g=""#));
+		assert!(s.contains(r#""ApproachSoundFormat":"mp3""#));
+
+		// DefaultSound: 両ロール指定時。
+		let s = serde_json::to_string(&DefaultSoundMessage::new(
+			Some("UkVDRUlWRUQ=".into()),
+			Some("wav".into()),
+			Some("QVBQUk9BQ0g=".into()),
+			Some("mp3".into()),
+		))
+		.unwrap();
+		assert!(s.contains(r#""MessageType":"DefaultSound""#));
+		assert!(s.contains(r#""ReceivedSoundBase64":"UkVDRUlWRUQ=""#));
+		assert!(s.contains(r#""ReceivedSoundFormat":"wav""#));
+		assert!(s.contains(r#""ApproachSoundBase64":"QVBQUk9BQ0g=""#));
+		assert!(s.contains(r#""ApproachSoundFormat":"mp3""#));
+
+		// DefaultSound: 全省略時 (既定値をリセットするケース) はキー自体を出さない。
+		let s = serde_json::to_string(&DefaultSoundMessage::new(None, None, None, None)).unwrap();
+		assert!(s.contains(r#""MessageType":"DefaultSound""#));
+		assert!(!s.contains("ReceivedSoundBase64"));
+		assert!(!s.contains("ReceivedSoundFormat"));
+		assert!(!s.contains("ApproachSoundBase64"));
+		assert!(!s.contains("ApproachSoundFormat"));
 
 		let s = serde_json::to_string(&TimeFormatMessage::new(Some("HH:mm".into()))).unwrap();
 		assert!(s.contains(r#""Format":"HH:mm""#));

@@ -630,6 +630,8 @@ mod tests {
 			Some("1.0".into()),
 			None,
 			None,
+			None,
+			None,
 		))
 		.unwrap();
 		assert!(s.contains(r#""MessageType":"ServerInfo""#));
@@ -639,6 +641,10 @@ mod tests {
 			!s.contains("Features"),
 			"Features 省略時はキー自体を出さない"
 		);
+		assert!(
+			!s.contains("IconImage"),
+			"IconImage/IconImageDark 省略時はキー自体を出さない"
+		);
 
 		let s = serde_json::to_string(&ServerInfoMessage::new(
 			Some("srv".into()),
@@ -646,9 +652,13 @@ mod tests {
 			Some("1.0".into()),
 			Some("1.1".into()),
 			Some(vec!["TrainSearch".into()]),
+			Some("data:image/png;base64,iVBORw0KGgo=".into()),
+			Some("data:image/svg+xml;base64,PHN2Zz4=".into()),
 		))
 		.unwrap();
 		assert!(s.contains(r#""Features":["TrainSearch"]"#));
+		assert!(s.contains(r#""IconImage":"data:image/png;base64,iVBORw0KGgo=""#));
+		assert!(s.contains(r#""IconImageDark":"data:image/svg+xml;base64,PHN2Zz4=""#));
 
 		let s = serde_json::to_string(&DiagramInfoMessage::new(
 			Some("d1".into()),

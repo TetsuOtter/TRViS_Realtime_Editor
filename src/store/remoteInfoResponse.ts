@@ -17,6 +17,8 @@ export interface ServerInfoResponse {
 	protocolVersion: string | null;
 	/** `TrainSearchEnabled` が true のときのみ `["TrainSearch"]`、それ以外は null (拡張機能なし)。 */
 	features: string[] | null;
+	iconImage: string | null;
+	iconImageDark: string | null;
 }
 
 /**
@@ -33,6 +35,8 @@ export function buildServerInfoResponse(
 		version: trimOrNull(info.Version) ?? appVersion,
 		protocolVersion: trimOrNull(info.ProtocolVersion) ?? "1.1",
 		features: info.TrainSearchEnabled ? ["TrainSearch"] : null,
+		iconImage: trimOrNull(info.IconImage),
+		iconImageDark: trimOrNull(info.IconImageDark),
 	};
 }
 

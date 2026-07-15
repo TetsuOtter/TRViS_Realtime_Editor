@@ -134,6 +134,13 @@ export interface ServerInfoMessage {
 	 * 省略/null は「拡張機能なし」を意味する。
 	 */
 	Features?: string[] | null;
+	/**
+	 * サーバアイコン (ライトモード)。`data:<mime>;base64,...` またはプレーンな
+	 * base64 (PNG 扱い)。png/jpeg/gif/svg+xml に対応。
+	 */
+	IconImage?: string | null;
+	/** サーバアイコン (ダークモード)。省略時、クライアントは `IconImage` にフォールバックする。 */
+	IconImageDark?: string | null;
 }
 
 /**
@@ -363,6 +370,16 @@ export interface EditorServerInfo {
 	 * (クライアントはタイムアウトする)。
 	 */
 	TrainSearchEnabled: boolean;
+	/**
+	 * サーバアイコン (ライトモード)。`data:<mime>;base64,...` 形式。
+	 * 空文字なら未設定 (null) として送出する。
+	 */
+	IconImage: string;
+	/**
+	 * サーバアイコン (ダークモード)。空文字なら未設定 (null) として送出する
+	 * (クライアントは `IconImage` にフォールバックする)。
+	 */
+	IconImageDark: string;
 }
 
 /**

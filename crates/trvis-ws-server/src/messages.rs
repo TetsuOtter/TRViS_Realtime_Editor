@@ -139,6 +139,13 @@ pub struct ServerInfoMessage {
 	/// 省略/null は「拡張機能なし」を意味する。
 	#[serde(rename = "Features", skip_serializing_if = "Option::is_none")]
 	pub features: Option<Vec<String>>,
+	/// サーバアイコン (ライトモード)。`data:<mime>;base64,...` またはプレーンな
+	/// base64 (PNG 扱い)。png/jpeg/gif/svg+xml に対応。
+	#[serde(rename = "IconImage", skip_serializing_if = "Option::is_none")]
+	pub icon_image: Option<String>,
+	/// サーバアイコン (ダークモード)。省略時、クライアントは `IconImage` にフォールバックする。
+	#[serde(rename = "IconImageDark", skip_serializing_if = "Option::is_none")]
+	pub icon_image_dark: Option<String>,
 }
 
 impl ServerInfoMessage {
@@ -148,6 +155,8 @@ impl ServerInfoMessage {
 		version: Option<String>,
 		protocol_version: Option<String>,
 		features: Option<Vec<String>>,
+		icon_image: Option<String>,
+		icon_image_dark: Option<String>,
 	) -> Self {
 		Self {
 			message_type: "ServerInfo".into(),
@@ -156,6 +165,8 @@ impl ServerInfoMessage {
 			version,
 			protocol_version,
 			features,
+			icon_image,
+			icon_image_dark,
 		}
 	}
 }

@@ -95,3 +95,24 @@ export function fileToBase64(file: File): Promise<string> {
 		reader.readAsDataURL(file);
 	});
 }
+
+/**
+ * File を `data:<mime>;base64,...` 形式の data URI へ変換する。
+ *
+ * TRViS 本体の `ServerInfo.IconImage`/`IconImageDark` は data URI (もしくは
+ * PNG 扱いのプレーン base64) を受け付けるため、`fileToBase64` と異なり
+ * プレフィクスを保持する (png/jpg/gif/svg のいずれも mime 判別に必要)。
+ */
+export function fileToImageDataUri(file: File): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onerror = () => reject(reader.error ?? new Error("ファイル読み込みに失敗しました"));
+		reader.onload = () => resolve(String(reader.result ?? ""));
+		reader.readAsDataURL(file);
+	});
+}
+
+/** 長さのみで「描画が重い可能性のある内容」を判定する ( data URI は base64 文字種のみとは限らないため)。 */
+export function isLikelyLargeContent(s: string): boolean {
+	return s.length >= LARGE_CONTENT_THRESHOLD;
+}

@@ -9,6 +9,8 @@ const baseServer: EditorServerInfo = {
 	Version: "",
 	ProtocolVersion: "",
 	TrainSearchEnabled: true,
+	IconImage: "",
+	IconImageDark: "",
 };
 
 const baseDiagram: EditorDiagramInfo = {
@@ -27,6 +29,8 @@ describe("buildServerInfoResponse", () => {
 			version: "1.2.3",
 			protocolVersion: "1.1",
 			features: ["TrainSearch"],
+			iconImage: null,
+			iconImageDark: null,
 		});
 	});
 
@@ -43,6 +47,8 @@ describe("buildServerInfoResponse", () => {
 				Version: " 9.9 ",
 				ProtocolVersion: "2",
 				TrainSearchEnabled: true,
+				IconImage: " data:image/png;base64,iVBORw0KGgo= ",
+				IconImageDark: " data:image/svg+xml;base64,PHN2Zz4= ",
 			},
 			"1.0.0",
 		);
@@ -52,12 +58,20 @@ describe("buildServerInfoResponse", () => {
 			version: "9.9",
 			protocolVersion: "2",
 			features: ["TrainSearch"],
+			iconImage: "data:image/png;base64,iVBORw0KGgo=",
+			iconImageDark: "data:image/svg+xml;base64,PHN2Zz4=",
 		});
 	});
 
 	it("TrainSearchEnabled が false なら Features は null (機能を広告しない)", () => {
 		const r = buildServerInfoResponse({ ...baseServer, TrainSearchEnabled: false }, "1.0.0");
 		expect(r.features).toBeNull();
+	});
+
+	it("IconImage/IconImageDark 空欄は null になる", () => {
+		const r = buildServerInfoResponse(baseServer, "1.0.0");
+		expect(r.iconImage).toBeNull();
+		expect(r.iconImageDark).toBeNull();
 	});
 });
 

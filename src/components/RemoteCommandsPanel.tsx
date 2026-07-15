@@ -12,7 +12,13 @@ import {
 } from "../api/wsServer";
 import { selectActiveTrain, useEditorStore } from "../store/editorStore";
 import type { OperationCommandAction } from "../types/trvis";
-import { fileToBase64, isLikelyBase64, soundFormatFromFileName } from "../types/trvisEnums";
+import {
+	fileToBase64,
+	fileToImageDataUri,
+	isLikelyBase64,
+	isLikelyLargeContent,
+	soundFormatFromFileName,
+} from "../types/trvisEnums";
 
 const OPERATION_BUTTONS: { action: OperationCommandAction; label: string; danger?: boolean }[] = [
 	{ action: "StartOperation", label: "運行開始" },
@@ -172,6 +178,102 @@ function SoundPicker({
 						type="button"
 						onClick={() => {
 							onBase64Change("");
+							setRevealed(false);
+						}}
+						style={buttonStyle}
+					>
+						クリア
+					</button>
+				)}
+			</div>
+		</div>
+	);
+}
+
+/**
+ * サーバアイコン (ServerInfo.IconImage/IconImageDark) の入力欄。
+ * ファイル選択で png/jpg/gif/svg を data URI 化できる。SoundPicker 同様、
+ * 長い内容は既定で畳んで描画負荷を抑える。
+ */
+function ImagePicker({
+	value,
+	onChange,
+	placeholder,
+}: {
+	value: string;
+	onChange: (v: string) => void;
+	placeholder: string;
+}) {
+	const fileRef = useRef<HTMLInputElement>(null);
+	const [busy, setBusy] = useState(false);
+	const [revealed, setRevealed] = useState(false);
+	const heavy = isLikelyLargeContent(value);
+	const hideInput = heavy && !revealed;
+
+	const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		e.target.value = "";
+		if (!file) return;
+		setBusy(true);
+		try {
+			const dataUri = await fileToImageDataUri(file);
+			onChange(dataUri);
+			setRevealed(false);
+		} catch (err) {
+			console.error("画像ファイルの読み込みに失敗しました:", err);
+			alert(`画像ファイルの読み込みに失敗しました: ${err}`);
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+			<input
+				ref={fileRef}
+				type="file"
+				accept=".png,.jpg,.jpeg,.gif,.svg,image/png,image/jpeg,image/gif,image/svg+xml"
+				onChange={onPick}
+				style={{ display: "none" }}
+			/>
+			{hideInput ? (
+				<div
+					style={{
+						...textInputStyle,
+						color: "var(--text-muted)",
+						background: "var(--bg-panel)",
+					}}
+				>
+					data URI ({value.length.toLocaleString()} 文字) — 描画が重いため既定で非表示
+				</div>
+			) : (
+				<input
+					type="text"
+					placeholder={placeholder}
+					value={value}
+					onChange={(e) => onChange(e.target.value)}
+					style={textInputStyle}
+				/>
+			)}
+			<div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+				<button
+					type="button"
+					onClick={() => fileRef.current?.click()}
+					disabled={busy}
+					style={{ ...buttonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? "wait" : "pointer" }}
+				>
+					{busy ? "読み込み中…" : "ファイルを選択 (png/jpg/gif/svg)"}
+				</button>
+				{heavy && (
+					<button type="button" onClick={() => setRevealed((r) => !r)} style={buttonStyle}>
+						{revealed ? "テキストを隠す" : "テキストを表示/編集"}
+					</button>
+				)}
+				{value && (
+					<button
+						type="button"
+						onClick={() => {
+							onChange("");
 							setRevealed(false);
 						}}
 						style={buttonStyle}
@@ -761,6 +863,18 @@ export function RemoteCommandsPanel() {
 							/>
 							列車検索 (TrainSearch) に対応する
 						</label>
+						<span style={labelStyle}>アイコン (ライトモード)</span>
+						<ImagePicker
+							value={serverInfo.IconImage}
+							onChange={(v) => setServerInfo({ IconImage: v })}
+							placeholder="IconImage (data URI)"
+						/>
+						<span style={labelStyle}>アイコン (ダークモード・任意)</span>
+						<ImagePicker
+							value={serverInfo.IconImageDark}
+							onChange={(v) => setServerInfo({ IconImageDark: v })}
+							placeholder="IconImageDark (data URI、省略時はライト版を流用)"
+						/>
 						<button
 							onClick={() =>
 								guard(
@@ -771,6 +885,8 @@ export function RemoteCommandsPanel() {
 											version: serverInfo.Version.trim() || null,
 											protocolVersion: serverInfo.ProtocolVersion.trim() || null,
 											features: serverInfo.TrainSearchEnabled ? ["TrainSearch"] : null,
+											iconImage: serverInfo.IconImage.trim() || null,
+											iconImageDark: serverInfo.IconImageDark.trim() || null,
 										}),
 									"ServerInfo.broadcast",
 								)

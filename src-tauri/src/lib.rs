@@ -316,6 +316,7 @@ async fn broadcast_time_format(
 /// 全クライアントへ `ServerInfo` を送る (proactive broadcast)。
 /// `RequestServerInfo` への応答は `respond_server_info` を使うこと。
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn broadcast_server_info(
 	state: State<'_, AppState>,
 	name: Option<String>,
@@ -323,10 +324,20 @@ async fn broadcast_server_info(
 	version: Option<String>,
 	protocol_version: Option<String>,
 	features: Option<Vec<String>>,
+	icon_image: Option<String>,
+	icon_image_dark: Option<String>,
 ) -> Result<(), String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
-	let msg = ServerInfoMessage::new(name, admin, version, protocol_version, features);
+	let msg = ServerInfoMessage::new(
+		name,
+		admin,
+		version,
+		protocol_version,
+		features,
+		icon_image,
+		icon_image_dark,
+	);
 	handle
 		.state
 		.broadcast(OutboundMessage::ServerInfo(msg))
@@ -337,6 +348,7 @@ async fn broadcast_server_info(
 /// 特定のクライアントだけに `ServerInfo` を返信する (`RequestServerInfo` の応答用)。
 /// 戻り値は送信に成功したかどうか (false = 送信先クライアントが既に切断されている)。
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn respond_server_info(
 	state: State<'_, AppState>,
 	client_id: String,
@@ -345,10 +357,20 @@ async fn respond_server_info(
 	version: Option<String>,
 	protocol_version: Option<String>,
 	features: Option<Vec<String>>,
+	icon_image: Option<String>,
+	icon_image_dark: Option<String>,
 ) -> Result<bool, String> {
 	let guard = state.server.lock().await;
 	let handle = guard.as_ref().ok_or("サーバが未起動です")?;
-	let msg = ServerInfoMessage::new(name, admin, version, protocol_version, features);
+	let msg = ServerInfoMessage::new(
+		name,
+		admin,
+		version,
+		protocol_version,
+		features,
+		icon_image,
+		icon_image_dark,
+	);
 	Ok(
 		handle
 			.state

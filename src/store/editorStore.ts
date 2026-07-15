@@ -257,6 +257,8 @@ export const useEditorStore = create<EditorState>()(
 				Version: "",
 				ProtocolVersion: "1.1",
 				TrainSearchEnabled: true,
+				IconImage: "",
+				IconImageDark: "",
 			},
 			diagramInfo: { DiagramId: "", Name: "", Description: "", WorkGroupIds: [] },
 			history: { past: [], future: [] },

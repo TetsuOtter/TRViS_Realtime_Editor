@@ -292,6 +292,8 @@ export async function broadcastServerInfo(args: {
 	version?: string | null;
 	protocolVersion?: string | null;
 	features?: string[] | null;
+	iconImage?: string | null;
+	iconImageDark?: string | null;
 }): Promise<void> {
 	const t = await loadTauri();
 	if (!t) return;
@@ -301,6 +303,8 @@ export async function broadcastServerInfo(args: {
 		version: args.version ?? null,
 		protocolVersion: args.protocolVersion ?? null,
 		features: args.features ?? null,
+		iconImage: args.iconImage ?? null,
+		iconImageDark: args.iconImageDark ?? null,
 	});
 }
 
@@ -315,6 +319,8 @@ export async function respondServerInfo(args: {
 	version?: string | null;
 	protocolVersion?: string | null;
 	features?: string[] | null;
+	iconImage?: string | null;
+	iconImageDark?: string | null;
 }): Promise<boolean> {
 	const t = await loadTauri();
 	if (!t) return false;
@@ -325,6 +331,8 @@ export async function respondServerInfo(args: {
 		version: args.version ?? null,
 		protocolVersion: args.protocolVersion ?? null,
 		features: args.features ?? null,
+		iconImage: args.iconImage ?? null,
+		iconImageDark: args.iconImageDark ?? null,
 	});
 }
 
